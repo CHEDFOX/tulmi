@@ -27,6 +27,7 @@ import {
   savePersonality,
   resolvePersonality,
 } from "./personality/store.js";
+import { buildBootstrap, buildScreen } from "./experience/catalog.js";
 import type {
   AudioFormat,
   ClientMessage,
@@ -257,6 +258,32 @@ app.put("/v1/personality", async (req, reply) => {
     req.log.error(err);
     return reply.code(500).send({ code: "internal", message: "Failed to save personality" });
   }
+});
+
+// --- Experience (SDUI): the backend drives the app's UI ---------------------
+//
+// The app is a generic renderer; these endpoints decide what it draws. Auth is
+// optional here so the shell can boot pre-login (personality is empty for guests).
+
+app.post("/v1/app/bootstrap", async (_req, reply) => {
+  return reply.send(buildBootstrap());
+});
+
+app.post("/v1/app/screen", async (req, reply) => {
+  const body = (req.body ?? {}) as { screenId?: string };
+  const screenId = body.screenId;
+  if (!screenId) {
+    return reply.code(400).send({ code: "bad_request", message: "Missing 'screenId'" });
+  }
+
+  const user = await resolveUser(req.headers["authorization"]);
+  const personality = user ? await getPersonality(user.id) : {};
+
+  const screen = buildScreen(screenId, { personality });
+  if (!screen) {
+    return reply.code(404).send({ code: "bad_request", message: `Unknown screen '${screenId}'` });
+  }
+  return reply.send(screen);
 });
 
 // --- Voice (WebSocket): live streaming --------------------------------------

@@ -1,0 +1,216 @@
+/**
+ * Component registry — maps SDUI node `type`s to React Native components, plus
+ * token-aware styling. The renderer (Renderer.tsx) resolves props/bind/style
+ * and hands them to these.
+ */
+import React, { createContext, useContext } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import type { Node, NodeEvent, ThemeTokens } from "./types";
+import { Store, getPath } from "./state";
+
+// --- Theme context ----------------------------------------------------------
+
+export const ThemeContext = createContext<ThemeTokens | null>(null);
+export const useTheme = (): ThemeTokens => {
+  const t = useContext(ThemeContext);
+  if (!t) throw new Error("ThemeContext missing");
+  return t;
+};
+
+// --- Styling ----------------------------------------------------------------
+
+/** Resolve a "$color.primary"-style token against the theme, else pass through. */
+function tok(value: any, theme: ThemeTokens): any {
+  if (typeof value === "string" && value.startsWith("$")) return getPath(theme, value.slice(1));
+  return value;
+}
+
+const ALIGN: Record<string, any> = { start: "flex-start", center: "center", end: "flex-end", stretch: "stretch" };
+const JUSTIFY: Record<string, any> = {
+  start: "flex-start", center: "center", end: "flex-end", between: "space-between", around: "space-around",
+};
+
+export function resolveStyle(style: Record<string, any> | undefined, theme: ThemeTokens): any {
+  if (!style) return {};
+  const s = style;
+  const out: Record<string, any> = {};
+  if (s.flex != null) out.flex = s.flex;
+  if (s.direction) out.flexDirection = s.direction;
+  if (s.align) out.alignItems = ALIGN[s.align];
+  if (s.justify) out.justifyContent = JUSTIFY[s.justify];
+  if (s.gap != null) out.gap = tok(s.gap, theme);
+  if (s.padding != null) out.padding = tok(s.padding, theme);
+  if (s.margin != null) out.margin = tok(s.margin, theme);
+  if (s.width != null) out.width = tok(s.width, theme);
+  if (s.height != null) out.height = tok(s.height, theme);
+  if (s.opacity != null) out.opacity = s.opacity;
+  if (s.background != null) out.backgroundColor = tok(s.background, theme);
+  if (s.color != null) out.color = tok(s.color, theme);
+  if (s.radius != null) out.borderRadius = tok(s.radius, theme);
+  if (s.borderWidth != null) out.borderWidth = s.borderWidth;
+  if (s.borderColor != null) out.borderColor = tok(s.borderColor, theme);
+  if (s.fontSize != null) out.fontSize = tok(s.fontSize, theme);
+  if (s.fontWeight != null) out.fontWeight = tok(s.fontWeight, theme);
+  if (s.textAlign != null) out.textAlign = s.textAlign;
+  return out;
+}
+
+function textVariant(variant: string | undefined, theme: ThemeTokens): any {
+  const f = theme.font.sizes;
+  switch (variant) {
+    case "h1": return { color: theme.color.text, fontSize: f.h1, fontWeight: theme.font.weights.heavy };
+    case "brand": return { color: theme.color.text, fontSize: f.brand, fontWeight: theme.font.weights.heavy };
+    case "label": return { color: theme.color.label, fontSize: f.label, marginBottom: 6 };
+    case "muted": return { color: theme.color.muted, fontSize: f.label, lineHeight: 19 };
+    case "caption": return { color: theme.color.muted, fontSize: f.caption };
+    default: return { color: theme.color.text, fontSize: f.body, lineHeight: 22 };
+  }
+}
+
+// --- Component props bag ----------------------------------------------------
+
+export interface CompProps {
+  node: Node;
+  props: Record<string, any>;
+  style: any;
+  store: Store;
+  children: React.ReactNode;
+  fire: (event: NodeEvent, value?: any) => void;
+}
+
+// --- Components -------------------------------------------------------------
+
+const Screen = ({ children, style }: CompProps) => {
+  const theme = useTheme();
+  return (
+    <ScrollView
+      style={{ flex: 1, backgroundColor: theme.color.bg }}
+      contentContainerStyle={[{ padding: theme.space.lg }, style]}
+      keyboardShouldPersistTaps="handled"
+    >
+      {children}
+    </ScrollView>
+  );
+};
+
+const Stack = ({ children, style }: CompProps) => <View style={style}>{children}</View>;
+
+const Spacer = ({ style }: CompProps) => <View style={style.height || style.width ? style : { flex: 1 }} />;
+
+const TextC = ({ props, style }: CompProps) => {
+  const theme = useTheme();
+  return <Text style={[textVariant(props.variant, theme), style]}>{props.content ?? ""}</Text>;
+};
+
+const ImageC = ({ props, style }: CompProps) => (
+  <Image source={{ uri: props.source }} style={[{ width: "100%", aspectRatio: props.aspectRatio ?? 1.6, borderRadius: 10 }, style]} />
+);
+
+const Icon = ({ props, style }: CompProps) => {
+  const theme = useTheme();
+  return <Text style={[{ fontSize: 20, color: theme.color.text }, style]}>{props.name}</Text>;
+};
+
+const Button = ({ props, style, fire }: CompProps) => {
+  const theme = useTheme();
+  const bg =
+    props.variant === "danger" ? theme.color.danger :
+    props.variant === "secondary" ? "#3a3a44" : theme.color.primary;
+  return (
+    <Pressable
+      onPress={() => fire("onPress")}
+      disabled={props.disabled}
+      style={({ pressed }) => [
+        { backgroundColor: bg, borderRadius: theme.radius.md, paddingVertical: 13, alignItems: "center", opacity: props.disabled ? 0.5 : pressed ? 0.85 : 1 },
+        style,
+      ]}
+    >
+      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{props.label}</Text>
+    </Pressable>
+  );
+};
+
+const TextField = ({ node, props, style, store, fire }: CompProps) => {
+  const theme = useTheme();
+  const bindPath = node.bind?.value;
+  return (
+    <TextInput
+      value={String(props.value ?? "")}
+      onChangeText={(t) => {
+        if (bindPath) store.set(bindPath, t);
+        fire("onChange", t);
+      }}
+      placeholder={props.placeholder}
+      placeholderTextColor={theme.color.muted}
+      multiline={props.multiline}
+      autoCapitalize={props.autoCapitalize}
+      autoCorrect={props.autoCorrect}
+      style={[
+        {
+          backgroundColor: theme.color.inputBg, color: theme.color.text, borderRadius: theme.radius.md,
+          paddingHorizontal: 12, paddingVertical: 10, minHeight: props.multiline ? 80 : 44,
+          borderWidth: 1, borderColor: theme.color.border, textAlignVertical: props.multiline ? "top" : "center",
+        },
+        style,
+      ]}
+    />
+  );
+};
+
+const Chip = ({ props, style, store, fire }: CompProps) => {
+  const theme = useTheme();
+  const selected = props.group ? store.get(props.group) === props.value : !!props.selected;
+  return (
+    <Pressable
+      onPress={() => {
+        if (props.group) store.set(props.group, props.value);
+        fire("onPress");
+      }}
+      style={[
+        {
+          paddingHorizontal: 14, paddingVertical: 8, borderRadius: theme.radius.pill, borderWidth: 1,
+          backgroundColor: selected ? theme.color.primary : theme.color.inputBg,
+          borderColor: selected ? theme.color.primary : theme.color.border,
+        },
+        style,
+      ]}
+    >
+      <Text style={{ color: selected ? "#fff" : theme.color.muted, fontWeight: selected ? "700" : "400" }}>{props.label}</Text>
+    </Pressable>
+  );
+};
+
+const Card = ({ children, style }: CompProps) => {
+  const theme = useTheme();
+  return (
+    <View style={[{ backgroundColor: theme.color.card, borderRadius: theme.radius.md, padding: 14, borderWidth: 1, borderColor: theme.color.border }, style]}>
+      {children}
+    </View>
+  );
+};
+
+const Divider = ({ style }: CompProps) => {
+  const theme = useTheme();
+  return <View style={[{ height: 1, backgroundColor: theme.color.border, marginVertical: 8 }, style]} />;
+};
+
+const ProgressBar = ({ style }: CompProps) => {
+  const theme = useTheme();
+  return <ActivityIndicator color={theme.color.primary} style={style} />;
+};
+
+// List is rendered specially by the renderer (needs per-item scope); placeholder here.
+const ListPlaceholder = ({ children }: CompProps) => <View>{children}</View>;
+
+export const REGISTRY: Record<string, React.ComponentType<CompProps>> = {
+  Screen, Stack, Spacer, Text: TextC, Image: ImageC, Icon, Button,
+  TextField, Chip, Card, Divider, ProgressBar, List: ListPlaceholder,
+};

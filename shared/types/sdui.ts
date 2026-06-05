@@ -216,8 +216,12 @@ export type ActionSpec =
       method: "GET" | "POST" | "PUT" | "DELETE";
       /** Path on the backend, e.g. "/v1/personality". */
       path: string;
-      /** Body literal or state dot-paths (resolved before sending). */
-      body?: Record<string, unknown>;
+      /**
+       * Request body. Either an object whose values may be placeholders
+       * ("$state.x"), or a single placeholder string that resolves to a whole
+       * subtree (e.g. "$state.form" → send the form object as the body).
+       */
+      body?: Record<string, unknown> | string;
       /** Store the JSON response at this state path. */
       assignTo?: string;
       onSuccess?: ActionRef;
