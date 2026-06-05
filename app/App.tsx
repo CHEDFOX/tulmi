@@ -3,7 +3,7 @@
  * personality, and a quick playground to test the backend. The actual keyboard
  * is a native module (added next), not part of this React Native tree.
  */
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -13,7 +13,12 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Audio } from "expo-av";
+import {
+  useAudioRecorder,
+  AudioModule,
+  RecordingPresets,
+  setAudioModeAsync,
+} from "expo-audio";
 import {
   DEFAULT_BASE_URL,
   getBaseUrl,
@@ -60,7 +65,7 @@ function HomeScreen() {
   const [out, setOut] = useState("");
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
-  const recRef = useRef<Audio.Recording | null>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   async function onRefine() {
     setBusy(true);
@@ -77,16 +82,14 @@ function HomeScreen() {
 
   async function startRec() {
     try {
-      const perm = await Audio.requestPermissionsAsync();
+      const perm = await AudioModule.requestRecordingPermissionsAsync();
       if (!perm.granted) {
         setOut("Microphone permission denied.");
         return;
       }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
-      );
-      recRef.current = recording;
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
       setRecording(true);
     } catch (e: any) {
       setOut("Mic error: " + e.message);
@@ -94,15 +97,13 @@ function HomeScreen() {
   }
 
   async function stopRec() {
-    const rec = recRef.current;
+    if (!recording) return;
     setRecording(false);
-    if (!rec) return;
     setBusy(true);
     setOut("");
     try {
-      await rec.stopAndUnloadAsync();
-      const uri = rec.getURI();
-      recRef.current = null;
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
       if (!uri) throw new Error("No audio captured");
       const { cleanedText } = await api.transcribeClean(uri, { targetApp: "WhatsApp", language: "auto" });
       setOut(cleanedText);

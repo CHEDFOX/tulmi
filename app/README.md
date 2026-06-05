@@ -22,7 +22,7 @@ npx create-expo-app@latest app --template blank-typescript
 cd app
 
 # 2. Install the runtime deps this app uses
-npx expo install expo-av @react-native-async-storage/async-storage
+npx expo install expo-audio @react-native-async-storage/async-storage
 
 # 3. Install EAS CLI (once, globally) and log in to your Expo account
 npm install -g eas-cli

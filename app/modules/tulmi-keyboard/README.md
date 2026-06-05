@@ -23,7 +23,7 @@ code). You need a **dev build**:
 
 ```bash
 cd app
-npx expo install expo-av @react-native-async-storage/async-storage
+npx expo install expo-audio @react-native-async-storage/async-storage
 npx expo prebuild -p android      # generates android/, runs the plugin
 npx expo run:android              # builds + installs on a device/emulator
 ```

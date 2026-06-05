@@ -24,10 +24,10 @@ const config: ExpoConfig = {
     package: "com.tulmi.app",
     permissions: ["android.permission.RECORD_AUDIO", "android.permission.INTERNET"],
   },
-  // expo-av provides mic-permission config; usesCleartextTraffic is enabled in
+  // expo-audio provides mic-permission config; usesCleartextTraffic is enabled in
   // the dev build so the app can reach a plain-HTTP backend during testing.
   // The keyboard plugin injects the native Android IME (Kotlin) at build time.
-  plugins: ["expo-av", "./modules/tulmi-keyboard/plugin/withTulmiKeyboard"],
+  plugins: ["expo-audio", "./modules/tulmi-keyboard/plugin/withTulmiKeyboard"],
 };
 
 export default config;
