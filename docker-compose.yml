@@ -1,0 +1,44 @@
+# Flow — one-command deploy.
+#
+#   HTTP only (quick test):   docker compose up -d --build
+#   With automatic HTTPS:     docker compose --profile https up -d --build
+#                             (requires a domain pointed at this VPS + deploy/Caddyfile edited)
+#
+# Keys come from backend/.env (never commit it). See .env.example.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - backend/.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+    # Exposes the backend directly on port 8080 (HTTP). When you use the
+    # `https` profile below, you can remove this and let Caddy be the only
+    # public entry point.
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  # Optional reverse proxy that gets + renews a free HTTPS certificate
+  # automatically. Only starts with the "https" profile.
+  caddy:
+    image: caddy:2
+    profiles: ["https"]
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
