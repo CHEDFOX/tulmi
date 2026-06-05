@@ -1,4 +1,12 @@
-# Deploying the Flow backend to a Hostinger VPS (shared with other apps)
+# Deploying the Tulmi backend to a Hostinger VPS (shared with other apps)
+
+> **Already cloned before the rename?** The backend folder moved from `backend/`
+> to `tulmi/`. Update with:
+> ```bash
+> cd ~/tulmi && git pull
+> cp .env.example tulmi/.env && nano tulmi/.env   # re-add your keys
+> docker compose up -d --build
+> ```
 
 This VPS already runs other apps, so these steps are designed to **not disturb
 them**: Flow runs in its own Docker container, binds to **localhost only** on an
@@ -56,8 +64,8 @@ cd tulmi
 ## 5. Add your keys
 
 ```bash
-cp .env.example backend/.env
-nano backend/.env       # fill GROQ_API_KEY + OPENROUTER_API_KEY; keep DEV_SKIP_AUTH=true
+cp .env.example tulmi/.env
+nano tulmi/.env       # fill GROQ_API_KEY + OPENROUTER_API_KEY; keep DEV_SKIP_AUTH=true
 ```
 
 Save: `Ctrl+O`, `Enter`, `Ctrl+X`.
@@ -70,7 +78,7 @@ the internet, zero conflict with your other apps:
 ```bash
 docker compose up -d --build
 curl http://localhost:8770/healthz
-# -> {"status":"ok","service":"flow-backend","version":"0.1.0"}
+# -> {"status":"ok","service":"tulmi-backend","version":"0.1.0"}
 ```
 
 (If 8770 was taken, run `FLOW_PORT=NNNN docker compose up -d --build` instead.)
@@ -163,8 +171,8 @@ git pull && docker compose up -d --build       # deploy a new version
 
 ## Notes
 
-- Secrets live only in `backend/.env` on the VPS — never committed.
-- Swap the cleanup model anytime via `CLEANUP_MODEL` in `backend/.env`, then
+- Secrets live only in `tulmi/.env` on the VPS — never committed.
+- Swap the cleanup model anytime via `CLEANUP_MODEL` in `tulmi/.env`, then
   `docker compose up -d --build`.
 - For real users: set `DEV_SKIP_AUTH=false`, add `SUPABASE_*`, and run the
-  migration in `backend/supabase/migrations/`.
+  migrations in `tulmi/supabase/migrations/`.

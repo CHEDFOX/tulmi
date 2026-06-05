@@ -2,7 +2,7 @@
  * Centralised, validated configuration. Everything secret comes from env vars
  * (see ../../.env.example). Nothing is hardcoded.
  *
- * We load .env from the backend folder first, then fall back to the repo root,
+ * We load .env from the tulmi/ folder first, then fall back to the repo root,
  * so either location works.
  */
 import { config as loadEnv } from "dotenv";
@@ -34,7 +34,7 @@ const EnvSchema = z.object({
   OPENROUTER_API_KEY: z.string().min(1, "OPENROUTER_API_KEY is required"),
   CLEANUP_MODEL: z.string().default("anthropic/claude-haiku-4.5"),
   OPENROUTER_APP_URL: z.string().default("https://flow.local"),
-  OPENROUTER_APP_NAME: z.string().default("Flow"),
+  OPENROUTER_APP_NAME: z.string().default("Tulmi"),
 
   // Supabase — optional when DEV_SKIP_AUTH is true.
   SUPABASE_URL: z.string().optional(),
@@ -48,8 +48,9 @@ const EnvSchema = z.object({
   // When true, auth + metering are skipped (local pipeline testing).
   DEV_SKIP_AUTH: bool(false),
 
-  // Cleanup prompt version to load from shared/prompts/.
-  CLEANUP_PROMPT_VERSION: z.string().default("v1"),
+  // Prompt versions to load from shared/prompts/.
+  CLEANUP_PROMPT_VERSION: z.string().default("v2"),
+  REPLY_PROMPT_VERSION: z.string().default("v1"),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema> & {

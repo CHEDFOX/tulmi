@@ -12,8 +12,8 @@ npm-debug.log*
 .pnpm-debug.log*
 
 # Backend test artifacts + sample audio (keep the README)
-backend/test-assets/*
-!backend/test-assets/README.md
+tulmi/test-assets/*
+!tulmi/test-assets/README.md
 
 # Android
 android/.gradle/

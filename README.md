@@ -1,50 +1,76 @@
-# Flow
+# Tulmi
 
-Voice dictation that actually understands how you talk — including **Hindi,
-Hinglish, and code-switching**, which other dictation apps treat as an
-afterthought.
+Your **AI language layer** for the phone. Speak, type, or point it at your
+screen — Tulmi turns rough input into clean, ready-to-send text **in your own
+voice**, with best-in-class **Hindi / Hinglish / code-switching** that other
+apps treat as an afterthought.
 
-**Core loop:** you speak → audio is transcribed → an LLM cleans it (removes
-fillers, punctuates, formats lists, matches the tone of the app you're typing
-in) → the polished text is inserted wherever your cursor is.
+## Three ways in, one brain (all powered by the backend)
+
+1. **🎙️ Speak** → audio is transcribed and cleaned (fillers removed, punctuated,
+   lists formatted) → inserted where your cursor is.
+2. **⌨️ Type** → rough text is rewritten the best way, like smart autocorrect.
+3. **🫧 Screen** → a floating bubble (Android) / Share-sheet (iOS) reads what's on
+   screen; you say what you want; Tulmi drafts a personalized reply.
+
+Every output is shaped by two things the **backend** owns:
+
+- **Personality** — your tone/style, set once in the app.
+- **Context** — which app you're in, who you're writing to, what's on screen.
+
+The apps are thin: they capture input and send it; the backend does the thinking.
 
 ---
 
 ## Monorepo layout
 
 ```
-flow/
+tulmi/
 ├─ shared/        Cross-cutting source of truth
-│  ├─ prompts/    Versioned cleanup prompt (the product's secret sauce)
-│  └─ types/      API request/response + streaming message contract (TypeScript)
-├─ backend/       Node + TypeScript (Fastify). Deploys to the VPS.
-│                 audio → Groq Whisper (STT) → OpenRouter LLM (cleanup) → text
-├─ android/       Native Kotlin custom keyboard (IME). Phase 1.
-└─ ios/           Placeholder. Native Swift keyboard extension — PHASE 2.
+│  ├─ prompts/    Versioned prompts (cleanup + reply) — the product's secret sauce
+│  └─ types/      API request/response + streaming contract (TypeScript)
+├─ tulmi/         Backend — Node + TypeScript (Fastify). Deploys to the VPS.
+│                 voice/typing/screen → Groq STT + OpenRouter LLM → personalized text
+├─ android/       Native Kotlin: custom keyboard (IME) + floating screen bubble
+└─ ios/           Native Swift: keyboard extension + Share-sheet (needs a Mac)
 ```
 
-## Phases
+## Platform note (important)
 
-- **Phase 1 (now):** Cloud pipeline (backend) + Android keyboard. Buildable on
-  Windows. Cloud-first, no on-device models. Usage metered from day one.
-- **Phase 2 (later):** iOS Swift keyboard extension (needs Mac/TestFlight).
+Android and iOS are built **together** off the same backend. One capability
+differs by platform: the **always-on floating bubble that reads any screen is
+Android-only** — Apple's sandbox forbids it. On iOS the same outcome is reached
+via the **Share-sheet / screenshot** into the app. Voice, typing, and the
+keyboard work on both.
 
 ## Tech decisions (locked)
 
 | Concern            | Choice                                                    |
 |--------------------|-----------------------------------------------------------|
-| Backend            | Node + TypeScript (Fastify)                               |
+| Backend            | Node + TypeScript (Fastify), in `tulmi/`                  |
 | Speech-to-text     | Groq Whisper API                                          |
-| Cleanup LLM        | OpenRouter, default `anthropic/claude-haiku-4.5` (swappable via env) |
-| Streaming          | WebSocket (+ a one-shot REST endpoint for simple cases)   |
-| Auth + DB + usage  | Supabase                                                  |
-| Android UI         | Native Kotlin `InputMethodService` (IME)                  |
+| Cleanup / reply LLM| OpenRouter, default `anthropic/claude-haiku-4.5` (swappable via env) |
+| Streaming          | WebSocket (+ one-shot REST endpoints)                     |
+| Auth + DB + usage  | Supabase (usage metered from day one)                     |
+| Android UI         | Native Kotlin `InputMethodService` + overlay bubble       |
+| iOS UI             | Native Swift keyboard extension + Share extension         |
 | Secrets            | Env vars only. See `.env.example`.                        |
+
+## Backend API (summary)
+
+| Mode    | Endpoint                                   |
+|---------|--------------------------------------------|
+| Voice   | `POST /v1/transcribe-clean`, `WS /v1/stream` |
+| Typing  | `POST /v1/refine`                          |
+| Screen  | `POST /v1/draft`                           |
+| Profile | `GET` / `PUT /v1/personality`              |
+
+Full contract: [`shared/types/api.ts`](shared/types/api.ts).
 
 ## Quick start (backend)
 
 ```bash
-cd backend
+cd tulmi
 cp ../.env.example .env      # then fill in your keys
 npm install
 npm run dev                  # starts the server
@@ -53,4 +79,5 @@ npm run dev                  # starts the server
 npm run test:pipeline -- ./test-assets/sample.m4a --app WhatsApp
 ```
 
-See [`backend/README.md`](backend/README.md) for details and the API contract.
+See [`tulmi/README.md`](tulmi/README.md) for details, and
+[`DEPLOY.md`](DEPLOY.md) to deploy to a VPS without disturbing other apps.

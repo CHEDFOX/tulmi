@@ -1,8 +1,8 @@
 {
-  "name": "flow-backend",
+  "name": "tulmi-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "Flow backend — audio → Groq Whisper (STT) → OpenRouter (cleanup) → text",
+  "description": "Tulmi backend — voice + typing + screen → personalized text (Groq STT, OpenRouter LLM)",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/backend/src/server.js",
+    "start": "node dist/tulmi/src/server.js",
     "typecheck": "tsc --noEmit",
     "test:pipeline": "tsx scripts/test-pipeline.ts"
   },

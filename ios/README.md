@@ -1,16 +1,27 @@
-# iOS — PHASE 2 (not started)
+# iOS (native Swift)
 
-This folder is intentionally reserved. **Do not implement iOS yet.**
+Built **alongside** Android off the same backend (`../tulmi/`), same API
+contract (`../shared/types/api.ts`), same prompts (`../shared/prompts/`). Only
+the surface is native Swift. **iOS requires a Mac (Xcode) to compile and ship.**
 
-iOS will be a **native Swift keyboard extension** (`UIInputViewController`),
-the iOS analogue of the Android custom keyboard in `../android/`. It needs Mac +
-Xcode + a TestFlight/Apple Developer account to build and distribute, so it is
-deliberately deferred to Phase 2.
+## What iOS includes
 
-When Phase 2 starts, it will reuse, unchanged:
-- the same backend (`../backend/`),
-- the same API contract (`../shared/types/api.ts`),
-- the same cleanup prompt (`../shared/prompts/`).
+- **Keyboard extension** (`UIInputViewController`) — mic button + typing-refine,
+  inserts text via `UITextDocumentProxy`. Mirrors the Android IME.
+- **Share extension** — the iOS equivalent of Android's screen bubble. The user
+  shares selected text / a screenshot into Tulmi; the app reads it and calls
+  `POST /v1/draft` to produce a personalized reply.
 
-Only the keyboard surface (recording, networking, text insertion via
-`UITextDocumentProxy`) gets a native Swift implementation here.
+## Platform limitation (by design)
+
+Apple's sandbox does **not** allow an always-on floating button that reads other
+apps' screens (Android's accessibility-overlay bubble). So on iOS the
+screen-reply feature is reached through the **Share-sheet / screenshot**, not a
+floating bubble. Voice, typing, and the keyboard all work the same on both
+platforms.
+
+## Status
+
+Folder reserved and the plan is fixed. Implementation begins once a Mac build
+environment is available (see the deploy/build notes the assistant provided for
+Mac options).

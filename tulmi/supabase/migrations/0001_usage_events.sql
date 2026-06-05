@@ -1,4 +1,4 @@
--- Flow — usage metering schema.
+-- Tulmi — usage metering schema.
 -- Run this in your Supabase project's SQL editor (or via the Supabase CLI).
 
 create table if not exists public.usage_events (

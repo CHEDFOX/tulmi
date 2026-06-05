@@ -18,9 +18,9 @@ services:
   backend:
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: tulmi/Dockerfile
     env_file:
-      - backend/.env
+      - tulmi/.env
     environment:
       HOST: 0.0.0.0 # inside the container; harmless
       PORT: 8080 # container-internal port

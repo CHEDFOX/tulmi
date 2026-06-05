@@ -48,12 +48,37 @@ export interface UsageRecord {
   model: string;
 }
 
-/** Options that shape a cleanup request (shared by REST + WS). */
+/**
+ * The user's personality / style profile. Set once in the app, stored in the
+ * backend, and applied to every output so the text sounds like *them*. The app
+ * may also pass an inline override per request.
+ */
+export interface Personality {
+  /** Free-text description of voice, e.g. "warm, concise, a little witty". */
+  tone?: string;
+  /** How formal the output should lean. */
+  formality?: "casual" | "neutral" | "formal";
+  /** How much emoji to use (only when it fits the app/context). */
+  emoji?: "none" | "minimal" | "expressive";
+  /** Preferred languages/scripts, in priority order (e.g. ["hinglish", "en"]). */
+  languages?: LanguageHint[];
+  /** Optional sign-off the user likes (only used where a sign-off fits). */
+  signature?: string;
+  /** Free-form extra instructions ("avoid exclamation marks", "use British spelling"). */
+  customInstructions?: string;
+}
+
+/** Options that shape a request (shared by voice, typing, and screen modes). */
 export interface CleanupOptions {
   /** App the user is typing into; drives tone + formatting. Default "Generic". */
   targetApp?: TargetAppHint;
   /** Language hint. Default "auto". */
   language?: LanguageHint;
+  /**
+   * Personality override for this request. If omitted, the backend uses the
+   * user's saved personality (resolved from their account).
+   */
+  personality?: Personality;
 }
 
 // ---------------------------------------------------------------------------
@@ -117,11 +142,67 @@ export type ErrorCode =
   | "internal";
 
 // ---------------------------------------------------------------------------
+// REST: typing-refine  (POST /v1/refine)
+// ---------------------------------------------------------------------------
+//
+// The "smart autocorrect" mode: the user TYPED some rough text and wants it
+// rewritten in the best way, in their personality + the target app's tone.
+// No audio, no STT — just text in, polished text out.
+
+export interface RefineRequest extends CleanupOptions {
+  /** The raw text the user typed. */
+  text: string;
+}
+
+export interface RefineResponse {
+  refinedText: string;
+  usage: UsageRecord; // audioSeconds is 0 here
+}
+
+// ---------------------------------------------------------------------------
+// REST: screen-reply  (POST /v1/draft)
+// ---------------------------------------------------------------------------
+//
+// The "screen bubble" / Share-sheet mode. The app captured what's on screen
+// (e.g. an email/chat) and the user said/typed what they want to do. The
+// backend drafts a personalized reply using their personality + who they're
+// writing to.
+//
+//   Android: floating bubble reads the screen via an accessibility service.
+//   iOS:     user shares the text / a screenshot into the app (Apple forbids
+//            reading other apps' screens directly).
+
+export interface DraftRequest extends CleanupOptions {
+  /** Text captured from the screen (the email/message/etc. being responded to). */
+  screenContent: string;
+  /** What the user wants, in plain language ("politely decline, suggest next week"). */
+  intent: string;
+  /** Optional: who the reply is addressed to, to tune tone. */
+  recipient?: string;
+}
+
+export interface DraftResponse {
+  draftText: string;
+  usage: UsageRecord;
+}
+
+// ---------------------------------------------------------------------------
+// REST: personality  (GET/PUT /v1/personality)
+// ---------------------------------------------------------------------------
+//
+// GET  → the user's saved personality (or an empty object if none set).
+// PUT  → save/replace it (body is a Personality).
+
+export interface PersonalityResponse {
+  personality: Personality;
+}
+
+// ---------------------------------------------------------------------------
 // Health
 // ---------------------------------------------------------------------------
 
 export interface HealthResponse {
   status: "ok";
-  service: "flow-backend";
+  service: "tulmi-backend";
   version: string;
 }
