@@ -9,9 +9,9 @@ target via [`@bacons/apple-targets`](https://github.com/EvanBacon/expo-apple-tar
 
 ```
 expo-target.config.js     declares the "keyboard" app-extension target
-Info.plist                NSExtension config + RequestsOpenAccess (network)
-KeyboardViewController.swift  the keyboard: QWERTY + ✨ Refine, inserts text
-TulmiBackend.swift        backend client (POST /v1/refine) — mirrors Net.kt
+Info.plist                NSExtension config + RequestsOpenAccess + mic usage
+KeyboardViewController.swift  the keyboard: QWERTY + 🎙 mic + ✨ Refine, inserts text
+TulmiBackend.swift        backend client (POST /v1/refine, /v1/transcribe-clean)
 ```
 
 ## Feature parity with Android
@@ -20,13 +20,15 @@ TulmiBackend.swift        backend client (POST /v1/refine) — mirrors Net.kt
 |---|---|---|
 | Typing (QWERTY) | ✅ | ✅ |
 | ✨ Refine whole field | ✅ | ✅ |
-| 🎙️ Voice dictation | ✅ (in-keyboard) | ⏳ via app-handoff (next step) |
+| 🎙️ Voice dictation | ✅ (in-keyboard) | ✅ (in-keyboard) |
 
-**Why no in-keyboard voice on iOS:** Apple does not give keyboard extensions
-microphone access, even with Full Access. The proven workaround (used by Wispr
-Flow) is to have the keyboard briefly open the **main Tulmi app**, which records
-the mic, transcribes via the backend, then hands the text back to the keyboard
-through a shared App Group container. That handoff is the next iOS task.
+**Voice runs inline in the keyboard** (not via an app-handoff). Despite older
+Apple docs, a keyboard extension *can* record the microphone once the user
+enables **Allow Full Access** — this is the same inline approach Wispr Flow uses.
+Requires `NSMicrophoneUsageDescription` (set in Info.plist) and `.record`
+AVAudioSession. If a future iOS build ever blocks this, the fallback is an
+app-handoff (keyboard opens the main app to record, then returns the text via a
+shared App Group).
 
 ## How it builds (requires macOS or EAS)
 
@@ -51,7 +53,8 @@ reach the backend). Switch to it with the 🌐 globe key.
 
 ## Known v1 limits / TODO
 
-- **Voice handoff** to the main app is not built yet (see table above).
+- Voice has only been verified to compile/build on macOS; confirm mic capture
+  works on a real device with Full Access enabled.
 - Backend URL is a constant in `TulmiBackend.swift` — bridge the app's saved URL
   (via a shared App Group) later.
 - iOS only exposes text *around the cursor*, so Refine replaces the visible

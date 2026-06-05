@@ -4,6 +4,9 @@
 <dict>
   <key>CFBundleDisplayName</key>
   <string>Tulmi</string>
+  <!-- Required so the keyboard can record voice for dictation (Full Access). -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Tulmi uses the microphone to turn your speech into clean text.</string>
   <key>NSExtension</key>
   <dict>
     <key>NSExtensionAttributes</key>

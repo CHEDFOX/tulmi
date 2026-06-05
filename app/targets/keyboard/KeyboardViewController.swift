@@ -1,23 +1,28 @@
 import UIKit
+import AVFoundation
 
 /// Tulmi keyboard (iOS custom keyboard extension).
 ///
-/// A minimal QWERTY with one special key:
-///   ✨ Refine → take the whole field → POST /v1/refine → replace with polished text
+/// A minimal QWERTY with two special keys, mirroring the Android IME:
+///   🎙️ mic    → record → POST /v1/transcribe-clean → insert cleaned text
+///   ✨ refine  → take the whole field → POST /v1/refine → replace with polished text
 ///
-/// Voice (🎙️) is intentionally NOT here: iOS does not give keyboard extensions
-/// microphone access. It will be added via an app-handoff flow (open the main
-/// Tulmi app to record, then hop back and insert) in a later step — the same
-/// approach Wispr Flow uses.
-///
-/// Refine requires the user to enable "Allow Full Access" for the keyboard
-/// (Settings → General → Keyboard → Keyboards), which permits network calls.
-class KeyboardViewController: UIInputViewController {
+/// Both special keys (network + microphone) require the user to enable "Allow
+/// Full Access" for the keyboard (Settings → General → Keyboard → Keyboards).
+/// Recording the mic inside a keyboard extension works with Full Access — this
+/// is the same inline approach Wispr Flow uses.
+class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
 
   private var capsOn = false
   private var letterButtons: [UIButton] = []
   private let statusLabel = UILabel()
   private var nextKeyboardButton: UIButton!
+  private var micButton: UIButton!
+
+  // Microphone / dictation state.
+  private var audioRecorder: AVAudioRecorder?
+  private var recordingURL: URL?
+  private var isRecording = false
 
   // QWERTY rows (the action row is built separately).
   private let rows: [[String]] = [
@@ -85,16 +90,19 @@ class KeyboardViewController: UIInputViewController {
     utilRow.addArrangedSubview(del)
     stack.addArrangedSubview(utilRow)
 
-    // Row 5: 🌐 next keyboard, ✨ refine, return.
+    // Row 5: 🌐 next keyboard, 🎙️ mic, ✨ refine, return.
     let actionRow = makeRowStack()
     nextKeyboardButton = makeKeyButton(title: "🌐")
     nextKeyboardButton.addTarget(self, action: #selector(handleInputModeList(from:with:)), for: .allTouchEvents)
+    micButton = makeKeyButton(title: "🎙️")
+    micButton.addTarget(self, action: #selector(micTapped), for: .touchUpInside)
     let refine = makeKeyButton(title: "✨ Refine")
     refine.backgroundColor = UIColor(red: 0.357, green: 0.294, blue: 1, alpha: 1) // #5b4bff
     refine.addTarget(self, action: #selector(refineTapped), for: .touchUpInside)
     let ret = makeKeyButton(title: "return")
     ret.addTarget(self, action: #selector(returnTapped), for: .touchUpInside)
     actionRow.addArrangedSubview(nextKeyboardButton)
+    actionRow.addArrangedSubview(micButton)
     actionRow.addArrangedSubview(refine)
     refine.widthAnchor.constraint(equalTo: nextKeyboardButton.widthAnchor, multiplier: 3).isActive = true
     actionRow.addArrangedSubview(ret)
@@ -142,6 +150,88 @@ class KeyboardViewController: UIInputViewController {
 
   @objc private func returnTapped() { textDocumentProxy.insertText("\n") }
 
+  // MARK: - Mic / dictation (inline; requires Full Access)
+
+  @objc private func micTapped() {
+    if isRecording { stopAndTranscribe() } else { startRecording() }
+  }
+
+  private func startRecording() {
+    let session = AVAudioSession.sharedInstance()
+    session.requestRecordPermission { [weak self] granted in
+      DispatchQueue.main.async {
+        guard let self = self else { return }
+        guard granted else {
+          self.setStatus("Open the Tulmi app once to allow microphone access.")
+          return
+        }
+        self.beginRecording(session: session)
+      }
+    }
+  }
+
+  private func beginRecording(session: AVAudioSession) {
+    do {
+      try session.setCategory(.record, mode: .default)
+      try session.setActive(true)
+
+      let url = FileManager.default.temporaryDirectory.appendingPathComponent("tulmi_rec.m4a")
+      let settings: [String: Any] = [
+        AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+        AVSampleRateKey: 16000,
+        AVNumberOfChannelsKey: 1,
+        AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
+      ]
+      let recorder = try AVAudioRecorder(url: url, settings: settings)
+      recorder.delegate = self
+      recorder.record()
+
+      audioRecorder = recorder
+      recordingURL = url
+      isRecording = true
+      micButton.setTitle("■", for: .normal)
+      setStatus("🎙️ Listening… tap to stop")
+    } catch {
+      setStatus("Mic error: \(error.localizedDescription)")
+      cleanupRecorder()
+    }
+  }
+
+  private func stopAndTranscribe() {
+    isRecording = false
+    micButton.setTitle("🎙️", for: .normal)
+    audioRecorder?.stop()
+    try? AVAudioSession.sharedInstance().setActive(false)
+
+    guard let url = recordingURL,
+          FileManager.default.fileExists(atPath: url.path) else {
+      setStatus("No audio captured.")
+      cleanupRecorder()
+      return
+    }
+    setStatus("Transcribing…")
+    let fileURL = url
+
+    TulmiBackend.transcribeClean(fileURL: fileURL, targetApp: "Generic") { [weak self] result in
+      DispatchQueue.main.async {
+        guard let self = self else { return }
+        switch result {
+        case .success(let cleaned):
+          self.textDocumentProxy.insertText(cleaned)
+          self.setStatus("")
+        case .failure(let err):
+          self.setStatus("Error: \(err.localizedDescription)")
+        }
+        self.cleanupRecorder()
+      }
+    }
+  }
+
+  private func cleanupRecorder() {
+    audioRecorder = nil
+    recordingURL = nil
+  }
+
   // MARK: - Refine
 
   @objc private func refineTapped() {
@@ -174,9 +264,7 @@ class KeyboardViewController: UIInputViewController {
   /// best-effort replacement that matches what the user can see.
   private func replaceFieldText(before: String, after: String, with newText: String) {
     let proxy = textDocumentProxy
-    // Move the cursor to the end of the known context.
     proxy.adjustTextPosition(byCharacterOffset: after.count)
-    // Delete the whole known context.
     for _ in 0..<(before.count + after.count) { proxy.deleteBackward() }
     proxy.insertText(newText)
   }
@@ -186,5 +274,19 @@ class KeyboardViewController: UIInputViewController {
   private func setStatus(_ text: String) {
     statusLabel.text = text
     statusLabel.isHidden = text.isEmpty
+  }
+
+  override func textWillChange(_ textInput: UITextInput?) {}
+
+  // Stop any in-flight recording if the keyboard goes away.
+  override func viewWillDisappear(_ animated: Bool) {
+    super.viewWillDisappear(animated)
+    if isRecording {
+      isRecording = false
+      audioRecorder?.stop()
+      try? AVAudioSession.sharedInstance().setActive(false)
+      cleanupRecorder()
+      setStatus("")
+    }
   }
 }
