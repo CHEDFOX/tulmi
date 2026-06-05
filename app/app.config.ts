@@ -26,7 +26,8 @@ const config: ExpoConfig = {
   },
   // expo-av provides mic-permission config; usesCleartextTraffic is enabled in
   // the dev build so the app can reach a plain-HTTP backend during testing.
-  plugins: ["expo-av"],
+  // The keyboard plugin injects the native Android IME (Kotlin) at build time.
+  plugins: ["expo-av", "./modules/tulmi-keyboard/plugin/withTulmiKeyboard"],
 };
 
 export default config;
