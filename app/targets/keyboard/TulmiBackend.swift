@@ -1,0 +1,64 @@
+import Foundation
+
+/// Tiny backend client for the iOS keyboard. Mirrors Android's Net.kt.
+///
+/// NOTE: until we bridge the app's saved backend URL into the keyboard (via a
+/// shared App Group), set baseUrl here. iOS Simulator → your PC = localhost; a
+/// physical iPhone → your PC's LAN IP, or your VPS URL.
+enum TulmiBackend {
+  static var baseUrl = "http://localhost:8770"
+  private static let token = "dev" // backend runs with DEV_SKIP_AUTH for now
+
+  enum BackendError: LocalizedError {
+    case http(Int, String)
+    case badResponse
+    var errorDescription: String? {
+      switch self {
+      case .http(let code, let body): return "refine \(code): \(body)"
+      case .badResponse: return "Unexpected response"
+      }
+    }
+  }
+
+  static func refine(
+    text: String,
+    targetApp: String,
+    completion: @escaping (Result<String, Error>) -> Void
+  ) {
+    guard let url = URL(string: "\(baseUrl)/v1/refine") else {
+      completion(.failure(BackendError.badResponse))
+      return
+    }
+    var req = URLRequest(url: url)
+    req.httpMethod = "POST"
+    req.timeoutInterval = 60
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    req.httpBody = try? JSONSerialization.data(withJSONObject: [
+      "text": text,
+      "targetApp": targetApp,
+      "language": "auto",
+    ])
+
+    URLSession.shared.dataTask(with: req) { data, response, error in
+      if let error = error {
+        completion(.failure(error))
+        return
+      }
+      let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+      if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+        completion(.failure(BackendError.http(http.statusCode, body)))
+        return
+      }
+      guard
+        let data = data,
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let refined = json["refinedText"] as? String
+      else {
+        completion(.failure(BackendError.badResponse))
+        return
+      }
+      completion(.success(refined))
+    }.resume()
+  }
+}

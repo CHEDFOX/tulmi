@@ -27,7 +27,12 @@ const config: ExpoConfig = {
   // expo-audio provides mic-permission config; usesCleartextTraffic is enabled in
   // the dev build so the app can reach a plain-HTTP backend during testing.
   // The keyboard plugin injects the native Android IME (Kotlin) at build time.
-  plugins: ["expo-audio", "./modules/tulmi-keyboard/plugin/withTulmiKeyboard"],
+  // @bacons/apple-targets adds the iOS keyboard extension (see targets/keyboard).
+  plugins: [
+    "expo-audio",
+    "./modules/tulmi-keyboard/plugin/withTulmiKeyboard",
+    "@bacons/apple-targets",
+  ],
 };
 
 export default config;
