@@ -6,6 +6,7 @@
  *   WS   /v1/stream               → voice (live): audio frames up, text down
  *   POST /v1/refine               → typing: text → polished text (autocorrect)
  *   POST /v1/draft                → screen: screen content + intent → reply
+ *   POST /v1/speak                → voice out: text → spoken audio (TTS)
  *   GET  /v1/personality          → read the user's saved style profile
  *   PUT  /v1/personality          → save the user's style profile
  *
@@ -20,6 +21,7 @@ import { resolveUser } from "./auth/supabase.js";
 import { recordUsage } from "./usage/metering.js";
 import { runPipeline, runPipelineStream } from "./pipeline/index.js";
 import { clean, draftReply } from "./pipeline/cleanup.js";
+import { synthesize } from "./pipeline/tts.js";
 import {
   getPersonality,
   savePersonality,
@@ -37,6 +39,7 @@ import type {
   RefineRequest,
   RefineResponse,
   ServerMessage,
+  SpeakRequest,
   TargetAppHint,
 } from "../../shared/types/api.js";
 import { WS_PATH } from "../../shared/types/api.js";
@@ -191,6 +194,40 @@ app.post("/v1/draft", async (req, reply) => {
   } catch (err) {
     req.log.error(err);
     return reply.code(500).send({ code: "cleanup_failed", message: "Draft failed" });
+  }
+});
+
+// --- Text-to-speech (REST): text → spoken audio -----------------------------
+
+app.post("/v1/speak", async (req, reply) => {
+  const user = await resolveUser(req.headers["authorization"]);
+  if (!user) {
+    return reply.code(401).send({ code: "unauthorized", message: "Missing or invalid token" });
+  }
+
+  const body = (req.body ?? {}) as SpeakRequest;
+  if (!body.text || !body.text.trim()) {
+    return reply.code(400).send({ code: "bad_request", message: "Missing 'text'" });
+  }
+
+  try {
+    const { audio, contentType } = await synthesize({
+      text: body.text,
+      voice: body.voice,
+      format: body.format,
+      instructions: body.instructions,
+    });
+    await recordUsage({
+      userId: user.id,
+      source: "rest",
+      audioSeconds: 0,
+      words: countWords(body.text),
+      model: cfg.OPENAI_TTS_MODEL,
+    });
+    return reply.header("content-type", contentType).send(audio);
+  } catch (err) {
+    req.log.error(err);
+    return reply.code(500).send({ code: "internal", message: "TTS failed" });
   }
 });
 

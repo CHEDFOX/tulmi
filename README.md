@@ -63,6 +63,7 @@ keyboard work on both.
 | Voice   | `POST /v1/transcribe-clean`, `WS /v1/stream` |
 | Typing  | `POST /v1/refine`                          |
 | Screen  | `POST /v1/draft`                           |
+| Voice out (TTS) | `POST /v1/speak`                   |
 | Profile | `GET` / `PUT /v1/personality`              |
 
 Full contract: [`shared/types/api.ts`](shared/types/api.ts).

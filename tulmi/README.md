@@ -52,6 +52,7 @@ token is accepted and mapped to a dev user.
 | Voice (live) | `WS /v1/stream` | `start` frame → binary audio → `end`; receive `ready` → `transcript` → `cleaned_delta`* → `done` |
 | Typing | `POST /v1/refine` | `{ text, targetApp?, language?, personality? }` → `{ refinedText, usage }` |
 | Screen | `POST /v1/draft` | `{ screenContent, intent, recipient?, targetApp?, language?, personality? }` → `{ draftText, usage }` |
+| Voice out | `POST /v1/speak` | `{ text, voice?, format?, instructions? }` → **binary audio** (TTS) |
 | Profile | `GET` / `PUT /v1/personality` | the user's saved `Personality` |
 
 Examples:

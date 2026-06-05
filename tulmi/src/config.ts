@@ -46,6 +46,13 @@ const EnvSchema = z.object({
   OPENROUTER_APP_URL: z.string().default("https://tulmi.local"),
   OPENROUTER_APP_NAME: z.string().default("Tulmi"),
 
+  // --- Text-to-speech (voice output: read-aloud / screen-clarify) ---
+  // Uses OPENAI_API_KEY. gpt-4o-mini-tts is cheap, multilingual, and steerable.
+  TTS_PROVIDER: z.enum(["openai"]).default("openai"),
+  OPENAI_TTS_MODEL: z.string().default("gpt-4o-mini-tts"),
+  TTS_VOICE: z.string().default("alloy"),
+  TTS_FORMAT: z.enum(["mp3", "opus", "aac", "flac", "wav", "pcm"]).default("mp3"),
+
   // Supabase — optional when DEV_SKIP_AUTH is true.
   SUPABASE_URL: z.string().optional(),
   SUPABASE_SERVICE_KEY: z.string().optional(),

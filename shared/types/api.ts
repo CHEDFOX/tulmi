@@ -191,6 +191,30 @@ export interface DraftResponse {
 }
 
 // ---------------------------------------------------------------------------
+// REST: text-to-speech  (POST /v1/speak)
+// ---------------------------------------------------------------------------
+//
+// Voice output (the "mouth"): text in → spoken audio out. Used when the app
+// needs to speak back — e.g. the screen bubble reading on-screen content aloud,
+// or reading a generated draft to the user.
+//
+// The response is BINARY audio (Content-Type per `format`, default audio/mpeg),
+// not JSON.
+
+export type TtsFormat = "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm";
+
+export interface SpeakRequest {
+  /** The text to speak. */
+  text: string;
+  /** Voice name (e.g. "alloy", "nova"). Defaults to the server's TTS_VOICE. */
+  voice?: string;
+  /** Output container. Defaults to the server's TTS_FORMAT (mp3). */
+  format?: TtsFormat;
+  /** Optional style steer, e.g. "calm and friendly" (can come from personality). */
+  instructions?: string;
+}
+
+// ---------------------------------------------------------------------------
 // REST: personality  (GET/PUT /v1/personality)
 // ---------------------------------------------------------------------------
 //
