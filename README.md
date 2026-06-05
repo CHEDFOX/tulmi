@@ -30,18 +30,23 @@ tulmi/
 │  ├─ prompts/    Versioned prompts (cleanup + reply) — the product's secret sauce
 │  └─ types/      API request/response + streaming contract (TypeScript)
 ├─ tulmi/         Backend — Node + TypeScript (Fastify). Deploys to the VPS.
-│                 voice/typing/screen → Groq STT + OpenRouter LLM → personalized text
-├─ android/       Native Kotlin: custom keyboard (IME) + floating screen bubble
-└─ ios/           Native Swift: keyboard extension + Share-sheet (needs a Mac)
+│                 voice/typing/screen → STT + OpenRouter LLM → personalized text
+└─ app/           Expo (React Native) — ONE codebase → Android + iOS via EAS.
+                  Main app (settings, personality, playground) in JS; the
+                  keyboard is a native module (Kotlin IME / Swift extension).
 ```
 
-## Platform note (important)
+## Apps: Expo shell + native keyboard
 
-Android and iOS are built **together** off the same backend. One capability
-differs by platform: the **always-on floating bubble that reads any screen is
-Android-only** — Apple's sandbox forbids it. On iOS the same outcome is reached
-via the **Share-sheet / screenshot** into the app. Voice, typing, and the
-keyboard work on both.
+Both platforms build from one **Expo** project (`app/`) via **EAS** — so iOS
+ships from Windows with no Mac. The keyboard surface stays **native** (a phone
+keyboard runs in a separate system process where JS can't run): native Kotlin
+`InputMethodService` on Android, native Swift keyboard extension on iOS, both
+wrapped and shipped by Expo. Only the main app UI is React Native.
+
+The **screen feature** differs by platform (Apple forbids reading other apps'
+screens): an always-on **floating bubble on Android**, the **Share-sheet** on
+iOS. Voice, typing, and the keyboard work on both.
 
 ## Tech decisions (locked)
 
@@ -52,8 +57,9 @@ keyboard work on both.
 | Cleanup / reply LLM| OpenRouter, default `anthropic/claude-haiku-4.5` (swappable via env) |
 | Streaming          | WebSocket (+ one-shot REST endpoints)                     |
 | Auth + DB + usage  | Supabase (usage metered from day one)                     |
-| Android UI         | Native Kotlin `InputMethodService` + overlay bubble       |
-| iOS UI             | Native Swift keyboard extension + Share extension         |
+| Mobile app shell   | Expo (React Native), one codebase, built via EAS          |
+| Android keyboard   | Native Kotlin `InputMethodService` (+ overlay bubble) module |
+| iOS keyboard       | Native Swift keyboard extension (+ Share extension) target |
 | Secrets            | Env vars only. See `.env.example`.                        |
 
 ## Backend API (summary)
