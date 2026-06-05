@@ -1,8 +1,16 @@
-# Flow — one-command deploy.
+# Flow — one-command deploy. SAFE FOR A SHARED VPS:
+# by default it binds to localhost only on an uncommon port and does NOT touch
+# ports 80/443, so it cannot collide with your other apps.
 #
-#   HTTP only (quick test):   docker compose up -d --build
-#   With automatic HTTPS:     docker compose --profile https up -d --build
-#                             (requires a domain pointed at this VPS + deploy/Caddyfile edited)
+#   Start (localhost only):   docker compose up -d --build
+#   Quick public test:        FLOW_BIND=0.0.0.0 docker compose up -d --build
+#                             (reach it at http://YOUR_VPS_IP:8770)
+#   Own HTTPS proxy (only if 80/443 are FREE):
+#                             docker compose --profile https up -d --build
+#
+# Tunables (set in your shell or in backend/.env):
+#   FLOW_BIND  - host interface to bind (default 127.0.0.1 = localhost only)
+#   FLOW_PORT  - host port (default 8770; change if 8770 is taken)
 #
 # Keys come from backend/.env (never commit it). See .env.example.
 
@@ -14,17 +22,19 @@ services:
     env_file:
       - backend/.env
     environment:
-      HOST: 0.0.0.0
-      PORT: 8080
-    # Exposes the backend directly on port 8080 (HTTP). When you use the
-    # `https` profile below, you can remove this and let Caddy be the only
-    # public entry point.
+      HOST: 0.0.0.0 # inside the container; harmless
+      PORT: 8080 # container-internal port
+    # Host-side binding. Default 127.0.0.1:8770 => private to this VPS, no
+    # public exposure, no chance of clashing with 80/443 or other backends.
     ports:
-      - "8080:8080"
+      - "${FLOW_BIND:-127.0.0.1}:${FLOW_PORT:-8770}:8080"
     restart: unless-stopped
 
-  # Optional reverse proxy that gets + renews a free HTTPS certificate
-  # automatically. Only starts with the "https" profile.
+  # OPTIONAL reverse proxy with automatic HTTPS. It claims ports 80 and 443, so
+  # ONLY use this if nothing else on the VPS is using them. If you already run
+  # nginx/Apache/Caddy for your other apps, DON'T enable this — instead add a
+  # subdomain to that existing proxy pointing at 127.0.0.1:8770 (see DEPLOY.md).
+  # It never starts on a plain `docker compose up` (profile-gated).
   caddy:
     image: caddy:2
     profiles: ["https"]
