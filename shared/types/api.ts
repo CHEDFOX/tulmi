@@ -14,13 +14,17 @@
 export type AudioFormat = "wav" | "m4a" | "webm" | "mp3" | "ogg" | "flac";
 
 /**
- * Language hint for transcription + cleanup.
+ * Language hint for transcription + cleanup. Tulmi targets most world
+ * languages, so this is open-ended: any ISO-639-1 code (e.g. "es", "fr", "ar",
+ * "ja") is accepted. The named values are conveniences:
  * - "auto"     : let the model detect (default; best for spontaneous speech)
  * - "hi"       : primarily Hindi
  * - "en"       : primarily English
- * - "hinglish" : explicit Hindi/English code-switching
+ * - "hinglish" : explicit Hindi/English code-switching (the flagship case)
+ *
+ * For any code-switching (Spanglish, Arabic/English, etc.), prefer "auto".
  */
-export type LanguageHint = "auto" | "hi" | "en" | "hinglish";
+export type LanguageHint = "auto" | "hi" | "en" | "hinglish" | (string & {});
 
 /**
  * What the user is typing into, used to adapt tone/format.

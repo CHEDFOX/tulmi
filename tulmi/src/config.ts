@@ -26,14 +26,24 @@ const bool = (def: boolean) =>
     .transform((v) => (v == null ? def : v.toLowerCase() === "true"));
 
 const EnvSchema = z.object({
-  // Groq (STT) — required to run the pipeline.
-  GROQ_API_KEY: z.string().min(1, "GROQ_API_KEY is required"),
+  // --- Speech-to-text provider ---
+  // "openai" (default) covers ~100 languages — best for a global product.
+  // "groq" is a fast/cheap Whisper alternative.
+  STT_PROVIDER: z.enum(["openai", "groq"]).default("openai"),
+
+  // OpenAI STT (used when STT_PROVIDER=openai). gpt-4o-transcribe is the
+  // current best; gpt-4o-mini-transcribe is cheaper; whisper-1 is the legacy.
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_STT_MODEL: z.string().default("gpt-4o-transcribe"),
+
+  // Groq STT (used when STT_PROVIDER=groq).
+  GROQ_API_KEY: z.string().optional(),
   GROQ_STT_MODEL: z.string().default("whisper-large-v3-turbo"),
 
   // OpenRouter (cleanup) — required to run the pipeline.
   OPENROUTER_API_KEY: z.string().min(1, "OPENROUTER_API_KEY is required"),
   CLEANUP_MODEL: z.string().default("anthropic/claude-haiku-4.5"),
-  OPENROUTER_APP_URL: z.string().default("https://flow.local"),
+  OPENROUTER_APP_URL: z.string().default("https://tulmi.local"),
   OPENROUTER_APP_NAME: z.string().default("Tulmi"),
 
   // Supabase — optional when DEV_SKIP_AUTH is true.
@@ -75,6 +85,21 @@ export function getConfig(): AppConfig {
   }
 
   const env = parsed.data;
+
+  // The selected STT provider must have its key.
+  if (env.STT_PROVIDER === "openai" && !env.OPENAI_API_KEY) {
+    throw new Error(
+      "STT_PROVIDER=openai but OPENAI_API_KEY is missing. Add OPENAI_API_KEY, " +
+        "or set STT_PROVIDER=groq and add GROQ_API_KEY.",
+    );
+  }
+  if (env.STT_PROVIDER === "groq" && !env.GROQ_API_KEY) {
+    throw new Error(
+      "STT_PROVIDER=groq but GROQ_API_KEY is missing. Add GROQ_API_KEY, " +
+        "or set STT_PROVIDER=openai and add OPENAI_API_KEY.",
+    );
+  }
+
   const supabaseEnabled = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY);
 
   if (!supabaseEnabled && !env.DEV_SKIP_AUTH) {

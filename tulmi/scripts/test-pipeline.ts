@@ -39,7 +39,7 @@ async function main() {
 
   if (!file) {
     console.error(
-      "Usage: npm run test:pipeline -- <audio-file> [--app WhatsApp] [--lang auto|hi|en|hinglish]",
+      "Usage: npm run test:pipeline -- <audio-file> [--app WhatsApp] [--lang auto|hi|en|hinglish|<iso-code>]",
     );
     process.exit(1);
   }

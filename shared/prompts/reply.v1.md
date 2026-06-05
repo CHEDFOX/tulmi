@@ -48,9 +48,9 @@ Write in this voice (tone, formality, emoji, sign-off):
   is casual and short; a Gmail reply is structured and professional, with a
   greeting/sign-off only where natural).
 - Recipient: **{{RECIPIENT}}** — tune warmth/formality to who this is for.
-- Language: **{{LANGUAGE}}** — mirror the user's language mix and script,
-  including natural Hindi/English code-switching. Don't translate; don't force a
-  script the user wouldn't use.
+- Language: **{{LANGUAGE}}** — mirror the user's language mix and script (any
+  world language), including natural code-switching (Hinglish, Spanglish, etc.).
+  Don't translate; don't force a script the user wouldn't use.
 
 # LENGTH
 

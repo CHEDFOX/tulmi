@@ -4,10 +4,10 @@ Node + TypeScript (Fastify). The "brain" behind every Tulmi surface — voice,
 typing, and screen-reply — all shaped by the user's personality + context.
 
 ```
-voice  ─▶ Groq Whisper (STT) ─┐
-typing ───────────────────────┼─▶ OpenRouter LLM ─▶ personalized text
-screen (content + intent) ────┘    (+ personality, + app context)
-                                                   └─▶ usage → Supabase
+voice  ─▶ STT (OpenAI gpt-4o-transcribe / Groq) ─┐
+typing ──────────────────────────────────────────┼─▶ OpenRouter LLM ─▶ personalized text
+screen (content + intent) ───────────────────────┘    (+ personality, + app context)
+                                                       └─▶ usage → Supabase
 ```
 
 ## Setup
@@ -91,7 +91,9 @@ the foundation for free-tier enforcement.
 
 | Var                      | Purpose                                            |
 |--------------------------|----------------------------------------------------|
-| `GROQ_STT_MODEL`         | Whisper model (default `whisper-large-v3-turbo`)   |
+| `STT_PROVIDER`           | `openai` (default, ~100 langs) or `groq`           |
+| `OPENAI_STT_MODEL`       | OpenAI STT model (default `gpt-4o-transcribe`)      |
+| `GROQ_STT_MODEL`         | Groq Whisper model (when `STT_PROVIDER=groq`)      |
 | `CLEANUP_MODEL`          | OpenRouter model — **swap this one line** to change the LLM |
 | `CLEANUP_PROMPT_VERSION` | Which `cleanup.<v>.md` to load (default `v2`)       |
 | `REPLY_PROMPT_VERSION`   | Which `reply.<v>.md` to load (default `v1`)         |

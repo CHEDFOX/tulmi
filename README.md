@@ -2,8 +2,8 @@
 
 Your **AI language layer** for the phone. Speak, type, or point it at your
 screen — Tulmi turns rough input into clean, ready-to-send text **in your own
-voice**, with best-in-class **Hindi / Hinglish / code-switching** that other
-apps treat as an afterthought.
+voice**, across **most world languages**, with best-in-class **Hindi / Hinglish
+/ code-switching** as the flagship that other apps treat as an afterthought.
 
 ## Three ways in, one brain (all powered by the backend)
 
@@ -48,7 +48,7 @@ keyboard work on both.
 | Concern            | Choice                                                    |
 |--------------------|-----------------------------------------------------------|
 | Backend            | Node + TypeScript (Fastify), in `tulmi/`                  |
-| Speech-to-text     | Groq Whisper API                                          |
+| Speech-to-text     | OpenAI `gpt-4o-transcribe` (default, ~100 langs); Groq Whisper optional. Provider via `STT_PROVIDER` |
 | Cleanup / reply LLM| OpenRouter, default `anthropic/claude-haiku-4.5` (swappable via env) |
 | Streaming          | WebSocket (+ one-shot REST endpoints)                     |
 | Auth + DB + usage  | Supabase (usage metered from day one)                     |
