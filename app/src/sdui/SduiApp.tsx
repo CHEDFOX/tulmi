@@ -18,7 +18,7 @@ import { ThemeContext } from "./components";
 import { Store } from "./state";
 import type { Ctx, NavApi } from "./actions";
 import type { BootstrapResponse, ScreenResponse, ThemeTokens } from "./types";
-import { DEFAULT_BASE_URL, getBaseUrl, setBaseUrl } from "../storage";
+import { DEFAULT_BASE_URL, getBaseUrl, setBaseUrl, getOnboarded, setOnboarded } from "../storage";
 import * as api from "../api";
 
 interface NavItem { screenId: string; params?: Record<string, any> }
@@ -47,7 +47,14 @@ export default function SduiApp() {
       setBoot(b);
       const firstTab = b.navigation.kind === "tabs" ? b.navigation.tabs[0]?.id ?? "" : "";
       setTabId(firstTab);
-      setStack([{ screenId: b.initialScreenId }]);
+      // First run → show onboarding once; afterwards go straight to the app.
+      const onboarded = await getOnboarded();
+      if (!onboarded) {
+        setStack([{ screenId: "onboarding" }]);
+        void setOnboarded();
+      } else {
+        setStack([{ screenId: b.initialScreenId }]);
+      }
       setShowConnection(false);
       setPhase("ready");
     } catch {

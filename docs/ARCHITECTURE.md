@@ -184,19 +184,23 @@ Built on the existing Fastify server (`tulmi/src/server.ts`). New surfaces:
 
 Big vision, shipped in disciplined slices. Each phase is independently testable.
 
-- **Phase 0 — Contract (this doc + `sdui.ts`).** ✅ in progress.
-- **Phase 1 — SDUI renderer.** RN renderer: component registry, action
-  interpreter, state engine, screen cache, capability handshake. Re-create the
-  current 3 screens *from the server* to prove parity.
-- **Phase 2 — Experience backend.** `/v1/app/bootstrap` + `/v1/app/screen`,
-  screen catalog, theme tokens, flags. App becomes fully server-driven.
-- **Phase 3 — Keyboard config.** `/v1/keyboard/config`; both keyboards read
-  theme/layout/copy/flags from it. Polish inline voice + refine on both OSes.
-- **Phase 4 — Smart depth.** Streaming dictation, app-aware tone, personality
-  applied everywhere.
-- **Phase 5 — Personalization.** Per-user style profile that learns over time.
-- **Phase 6 — Accounts, entitlements, polish.** Onboarding (server-driven),
-  paywall, metering, motion/haptic pass, store submission.
+- **Phase 0 — Contract (this doc + `sdui.ts`).** ✅ done.
+- **Phase 1 — SDUI renderer.** ✅ done. RN renderer: component registry, action
+  interpreter, state engine, screen cache, capability handshake. Screens are
+  rendered entirely from the server.
+- **Phase 2 — Experience backend.** ✅ done. `/v1/app/bootstrap` +
+  `/v1/app/screen`, screen catalog (Home, Reply, You, Settings, Onboarding),
+  theme tokens, flags. App is fully server-driven.
+- **Phase 3 — Keyboard config.** ✅ done. `/v1/keyboard/config`; both keyboards
+  fetch + cache it and apply theme/labels/feature-flags. Inline voice + refine
+  work on both OSes. (Per-keystroke layout stays native by design.)
+- **Phase 4 — Smart depth.** ⏳ next. Live streaming dictation (`/v1/stream`
+  exists; wire clients), deeper app-aware tone. Needs on-device tuning.
+- **Phase 5 — Personalization.** ⏳ Per-user style profile that learns over time
+  (needs persistence / accounts).
+- **Phase 6 — Accounts, entitlements, polish.** ⏳ Supabase auth (scaffolded),
+  paywall, metering, motion/haptic + visual pass, store submission. First-run
+  onboarding routing is ✅ done.
 
 ---
 

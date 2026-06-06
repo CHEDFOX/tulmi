@@ -20,3 +20,14 @@ export async function getBaseUrl(): Promise<string> {
 export async function setBaseUrl(url: string): Promise<void> {
   await AsyncStorage.setItem(KEY_BASE_URL, url.trim());
 }
+
+// Whether the user has seen onboarding (so we show it only on first run).
+const KEY_ONBOARDED = "tulmi.onboarded";
+
+export async function getOnboarded(): Promise<boolean> {
+  return (await AsyncStorage.getItem(KEY_ONBOARDED)) === "1";
+}
+
+export async function setOnboarded(): Promise<void> {
+  await AsyncStorage.setItem(KEY_ONBOARDED, "1");
+}
