@@ -139,6 +139,7 @@ function homeScreen(): ScreenResponse {
           { kind: "toast", message: "Couldn't reach the backend. Check ⚙ Connection.", tone: "error" },
         ],
       },
+      voiceErr: { kind: "toast", message: "Voice failed. Allow mic + check your key.", tone: "error" },
     },
     root: {
       type: "Screen",
@@ -157,6 +158,14 @@ function homeScreen(): ScreenResponse {
           type: "Button",
           props: { label: "✨ Refine", variant: "primary" },
           on: { onPress: "refine" },
+        },
+        spacer(10),
+        text("Or speak — it fills the box above:", "label"),
+        {
+          type: "VoiceButton",
+          bind: { value: "input" },
+          props: { targetApp: "WhatsApp", language: "auto" },
+          on: { onError: "voiceErr" },
         },
         spacer(16),
         { type: "ProgressBar", visibleIf: { truthy: "busy" } },

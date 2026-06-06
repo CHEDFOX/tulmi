@@ -27,7 +27,8 @@ export interface BootstrapResponse {
 
 export type NodeEvent =
   | "onPress" | "onLongPress" | "onChange" | "onSubmit"
-  | "onAppear" | "onDisappear" | "onRefresh" | "onEndReached";
+  | "onAppear" | "onDisappear" | "onRefresh" | "onEndReached"
+  | "onResult" | "onError";
 
 export interface MotionSpec {
   appear?: string;

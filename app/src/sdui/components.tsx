@@ -3,7 +3,7 @@
  * token-aware styling. The renderer (Renderer.tsx) resolves props/bind/style
  * and hands them to these.
  */
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -13,8 +13,15 @@ import {
   TextInput,
   View,
 } from "react-native";
+import {
+  useAudioRecorder,
+  AudioModule,
+  RecordingPresets,
+  setAudioModeAsync,
+} from "expo-audio";
 import type { Node, NodeEvent, ThemeTokens } from "./types";
 import { Store, getPath } from "./state";
+import * as api from "../api";
 
 // --- Theme context ----------------------------------------------------------
 
@@ -210,7 +217,76 @@ const ProgressBar = ({ style }: CompProps) => {
 // List is rendered specially by the renderer (needs per-item scope); placeholder here.
 const ListPlaceholder = ({ children }: CompProps) => <View>{children}</View>;
 
+/**
+ * VoiceButton — records the mic (expo-audio), uploads to /v1/transcribe-clean,
+ * and writes the cleaned text to bind.value. A server-declared native capability
+ * so the main app can dictate, not just the keyboard.
+ */
+const VoiceButton = ({ node, props, style, store, fire }: CompProps) => {
+  const theme = useTheme();
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const [recording, setRecording] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const bindPath = node.bind?.value;
+
+  async function start() {
+    try {
+      const perm = await AudioModule.requestRecordingPermissionsAsync();
+      if (!perm.granted) {
+        fire("onError", "Microphone permission denied");
+        return;
+      }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      setRecording(true);
+    } catch (e: any) {
+      fire("onError", e?.message ?? "mic error");
+    }
+  }
+
+  async function stop() {
+    setRecording(false);
+    setBusy(true);
+    try {
+      await recorder.stop();
+      const uri = recorder.uri;
+      if (!uri) throw new Error("No audio captured");
+      const { cleanedText } = await api.transcribeClean(uri, {
+        targetApp: props.targetApp,
+        language: props.language,
+      });
+      if (bindPath) store.set(bindPath, cleanedText);
+      fire("onChange", cleanedText);
+    } catch (e: any) {
+      fire("onError", e?.message ?? "transcription failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const label = busy
+    ? (props.transcribingLabel ?? "Transcribing…")
+    : recording
+    ? (props.stopLabel ?? "■ Stop & transcribe")
+    : (props.label ?? "🎙️ Record");
+  const bg = recording ? theme.color.danger : theme.color.primary;
+
+  return (
+    <Pressable
+      onPress={recording ? stop : start}
+      disabled={busy}
+      style={[
+        { backgroundColor: bg, borderRadius: theme.radius.md, paddingVertical: 13, alignItems: "center", opacity: busy ? 0.6 : 1 },
+        style,
+      ]}
+    >
+      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{label}</Text>
+    </Pressable>
+  );
+};
+
 export const REGISTRY: Record<string, React.ComponentType<CompProps>> = {
   Screen, Stack, Spacer, Text: TextC, Image: ImageC, Icon, Button,
-  TextField, Chip, Card, Divider, ProgressBar, List: ListPlaceholder,
+  TextField, Chip, Card, Divider, ProgressBar, List: ListPlaceholder, VoiceButton,
 };

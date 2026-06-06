@@ -168,7 +168,9 @@ export type NodeEvent =
   | "onAppear"
   | "onDisappear"
   | "onRefresh"
-  | "onEndReached";
+  | "onEndReached"
+  | "onResult" // async component produced a value (e.g. VoiceButton transcript)
+  | "onError"; // async component failed
 
 /**
  * The component registry the v1 renderer ships. The server discovers the real
