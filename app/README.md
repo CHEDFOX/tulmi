@@ -16,21 +16,18 @@ it.
 
 ## First-time setup (Windows, VS Code)
 
-The committed files here are the **source** (`App.tsx`, `src/`, `app.config.ts`,
-`eas.json`). Generate the Expo project boilerplate with correct, current
-versions, then this source slots in:
+The project is self-contained — `package.json`, `tsconfig.json`, `index.ts`,
+`App.tsx`, `src/`, `app.config.ts`, and `eas.json` are all committed. Just
+install and run:
 
 ```bash
-# 1. From the repo root, scaffold a blank TypeScript Expo app INTO ./app
-#    (run it in a temp dir and copy, or use --template blank-typescript)
-npx create-expo-app@latest app --template blank-typescript
-# (If 'app' already has these files, create in a temp folder and copy package.json,
-#  babel.config.js, tsconfig.json, .gitignore over — keep OUR App.tsx/src/app.config.ts/eas.json.)
-
 cd app
 
-# 2. Install the runtime deps this app uses
-npx expo install expo-audio @react-native-async-storage/async-storage
+# 1. Install dependencies (versions are pinned for Expo SDK 56)
+npm install
+
+# 2. (optional) align any native module versions to the SDK
+npx expo install --fix
 
 # 3. Install EAS CLI (once, globally) and log in to your Expo account
 npm install -g eas-cli
