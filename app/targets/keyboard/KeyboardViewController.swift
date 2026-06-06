@@ -15,9 +15,14 @@ class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
 
   private var capsOn = false
   private var letterButtons: [UIButton] = []
+  private var allKeys: [UIButton] = []
   private let statusLabel = UILabel()
   private var nextKeyboardButton: UIButton!
   private var micButton: UIButton!
+  private var refineButton: UIButton?
+
+  // Server-driven config (theme/labels/flags); nil until fetched/cached.
+  private var kbConfig: TulmiBackend.KbConfig?
 
   // Microphone / dictation state.
   private var audioRecorder: AVAudioRecorder?
@@ -35,6 +40,43 @@ class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
     super.viewDidLoad()
     view.backgroundColor = UIColor(red: 0.09, green: 0.09, blue: 0.11, alpha: 1) // #15151b-ish
     buildKeyboard()
+    loadAndApplyConfig()
+  }
+
+  // MARK: - Server-driven config (theme/labels/flags), cached for offline
+
+  private func loadAndApplyConfig() {
+    // Apply last-known config instantly so the keyboard never waits on the network.
+    if let data = UserDefaults.standard.data(forKey: "tulmi_kb_config"),
+       let cfg = TulmiBackend.parseConfig(data) {
+      applyConfig(cfg)
+    }
+    // Refresh in the background; cache for next launch.
+    TulmiBackend.keyboardConfigData { result in
+      guard case .success(let data) = result, let cfg = TulmiBackend.parseConfig(data) else { return }
+      UserDefaults.standard.set(data, forKey: "tulmi_kb_config")
+      DispatchQueue.main.async { self.applyConfig(cfg) }
+    }
+  }
+
+  private func applyConfig(_ cfg: TulmiBackend.KbConfig) {
+    kbConfig = cfg
+    view.backgroundColor = UIColor(tulmiHex: cfg.background)
+    for b in allKeys {
+      b.backgroundColor = UIColor(tulmiHex: cfg.key)
+      b.setTitleColor(UIColor(tulmiHex: cfg.keyText), for: .normal)
+    }
+    refineButton?.backgroundColor = UIColor(tulmiHex: cfg.accent)
+    if let r = cfg.labels["refine"] { refineButton?.setTitle(r, for: .normal) }
+    statusLabel.textColor = UIColor(tulmiHex: cfg.keyText)
+    micButton?.isEnabled = cfg.voice
+    micButton?.alpha = cfg.voice ? 1 : 0.4
+    refineButton?.isEnabled = cfg.refine
+    refineButton?.alpha = cfg.refine ? 1 : 0.4
+  }
+
+  private func label(_ key: String, _ fallback: String) -> String {
+    kbConfig?.labels[key] ?? fallback
   }
 
   // MARK: - Layout
@@ -99,6 +141,7 @@ class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
     let refine = makeKeyButton(title: "✨ Refine")
     refine.backgroundColor = UIColor(red: 0.357, green: 0.294, blue: 1, alpha: 1) // #5b4bff
     refine.addTarget(self, action: #selector(refineTapped), for: .touchUpInside)
+    refineButton = refine
     let ret = makeKeyButton(title: "return")
     ret.addTarget(self, action: #selector(returnTapped), for: .touchUpInside)
     actionRow.addArrangedSubview(nextKeyboardButton)
@@ -126,6 +169,7 @@ class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
     b.backgroundColor = UIColor(red: 0.11, green: 0.11, blue: 0.15, alpha: 1) // #1c1c25
     b.layer.cornerRadius = 6
     b.translatesAutoresizingMaskIntoConstraints = false
+    allKeys.append(b)
     return b
   }
 
@@ -190,7 +234,7 @@ class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
       recordingURL = url
       isRecording = true
       micButton.setTitle("■", for: .normal)
-      setStatus("🎙️ Listening… tap to stop")
+      setStatus(label("listening", "🎙️ Listening… tap to stop"))
     } catch {
       setStatus("Mic error: \(error.localizedDescription)")
       cleanupRecorder()
@@ -209,7 +253,7 @@ class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
       cleanupRecorder()
       return
     }
-    setStatus("Transcribing…")
+    setStatus(label("transcribing", "Transcribing…"))
     let fileURL = url
 
     TulmiBackend.transcribeClean(fileURL: fileURL, targetApp: "Generic") { [weak self] result in
@@ -243,7 +287,7 @@ class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
       setStatus("Type something first, then tap ✨")
       return
     }
-    setStatus("Refining…")
+    setStatus(label("refining", "Refining…"))
 
     TulmiBackend.refine(text: full, targetApp: "Generic") { [weak self] result in
       DispatchQueue.main.async {
@@ -288,5 +332,26 @@ class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
       cleanupRecorder()
       setStatus("")
     }
+  }
+}
+
+// MARK: - Hex color helper
+
+extension UIColor {
+  /// Parse "#rrggbb" (server theme tokens) into a UIColor; falls back to gray.
+  convenience init(tulmiHex hex: String) {
+    var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+    if s.hasPrefix("#") { s.removeFirst() }
+    var rgb: UInt64 = 0
+    guard s.count == 6, Scanner(string: s).scanHexInt64(&rgb) else {
+      self.init(white: 0.15, alpha: 1)
+      return
+    }
+    self.init(
+      red: CGFloat((rgb & 0xFF0000) >> 16) / 255.0,
+      green: CGFloat((rgb & 0x00FF00) >> 8) / 255.0,
+      blue: CGFloat(rgb & 0x0000FF) / 255.0,
+      alpha: 1
+    )
   }
 }

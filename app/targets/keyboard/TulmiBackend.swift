@@ -22,6 +22,56 @@ enum TulmiBackend {
     }
   }
 
+  // MARK: - Server-driven keyboard config
+
+  struct KbConfig {
+    let background: String
+    let key: String
+    let keyText: String
+    let accent: String
+    let voice: Bool
+    let refine: Bool
+    let labels: [String: String]
+  }
+
+  /// Fetch the raw config JSON (the caller both applies and caches it).
+  static func keyboardConfigData(completion: @escaping (Result<Data, Error>) -> Void) {
+    guard let url = URL(string: "\(baseUrl)/v1/keyboard/config") else {
+      completion(.failure(BackendError.badResponse))
+      return
+    }
+    var req = URLRequest(url: url)
+    req.httpMethod = "GET"
+    req.timeoutInterval = 30
+    req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    URLSession.shared.dataTask(with: req) { data, _, error in
+      if let error = error { completion(.failure(error)); return }
+      guard let data = data else { completion(.failure(BackendError.badResponse)); return }
+      completion(.success(data))
+    }.resume()
+  }
+
+  static func parseConfig(_ data: Data) -> KbConfig? {
+    guard
+      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      let theme = json["theme"] as? [String: Any],
+      let features = json["features"] as? [String: Any]
+    else { return nil }
+    var labels: [String: String] = [:]
+    if let raw = json["labels"] as? [String: Any] {
+      for (k, v) in raw { if let s = v as? String { labels[k] = s } }
+    }
+    return KbConfig(
+      background: theme["background"] as? String ?? "#15151b",
+      key: theme["key"] as? String ?? "#1c1c25",
+      keyText: theme["keyText"] as? String ?? "#ffffff",
+      accent: theme["accent"] as? String ?? "#5b4bff",
+      voice: features["voice"] as? Bool ?? true,
+      refine: features["refine"] as? Bool ?? true,
+      labels: labels
+    )
+  }
+
   static func refine(
     text: String,
     targetApp: String,

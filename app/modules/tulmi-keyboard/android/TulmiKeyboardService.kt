@@ -1,7 +1,9 @@
 package com.tulmi.app.keyboard
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.inputmethodservice.InputMethodService
 import android.inputmethodservice.Keyboard
 import android.inputmethodservice.KeyboardView
@@ -29,6 +31,10 @@ class TulmiKeyboardService : InputMethodService(), KeyboardView.OnKeyboardAction
     private lateinit var keyboardView: KeyboardView
     private lateinit var keyboard: Keyboard
     private var statusView: TextView? = null
+    private var rootView: View? = null
+
+    /** Server-driven config (theme/labels/flags); null until fetched/cached. */
+    private var kbConfig: Net.KbConfig? = null
 
     private var caps = false
     private var recorder: MediaRecorder? = null
@@ -56,8 +62,42 @@ class TulmiKeyboardService : InputMethodService(), KeyboardView.OnKeyboardAction
         keyboard = Keyboard(this, resources.getIdentifier("qwerty", "xml", packageName))
         keyboardView.keyboard = keyboard
         keyboardView.setOnKeyboardActionListener(this)
+        rootView = root
+        loadAndApplyConfig()
         return root
     }
+
+    // --- server-driven config (theme/labels/flags), cached for offline -------
+
+    private fun loadAndApplyConfig() {
+        val prefs = getSharedPreferences("tulmi_kb", Context.MODE_PRIVATE)
+        // Apply last-known config immediately so the keyboard never waits on the network.
+        prefs.getString("config_json", null)?.let {
+            try { applyConfig(Net.parseConfig(it)) } catch (_: Exception) {}
+        }
+        // Refresh in the background; cache the result for next time.
+        Thread {
+            try {
+                val json = Net.getKeyboardConfigJson()
+                val cfg = Net.parseConfig(json)
+                prefs.edit().putString("config_json", json).apply()
+                main.post { applyConfig(cfg) }
+            } catch (_: Exception) { /* offline → keep cached/defaults */ }
+        }.start()
+    }
+
+    private fun applyConfig(cfg: Net.KbConfig) {
+        kbConfig = cfg
+        try {
+            val bg = Color.parseColor(cfg.background)
+            rootView?.setBackgroundColor(bg)
+            keyboardView.setBackgroundColor(bg)
+            statusView?.setTextColor(Color.parseColor(cfg.keyText))
+        } catch (_: Exception) { /* malformed color → ignore */ }
+    }
+
+    private fun label(key: String, default: String): String =
+        kbConfig?.labels?.get(key) ?: default
 
     // --- key handling -------------------------------------------------------
 
@@ -72,8 +112,8 @@ class TulmiKeyboardService : InputMethodService(), KeyboardView.OnKeyboardAction
             }
             CODE_ENTER -> sendDefaultEditorAction(true)
             CODE_SPACE -> ic.commitText(" ", 1)
-            CODE_MIC -> toggleRecording()
-            CODE_REFINE -> refineField()
+            CODE_MIC -> if (kbConfig?.voice != false) toggleRecording() else setStatus(label("voiceOff", "Voice is off."))
+            CODE_REFINE -> if (kbConfig?.refine != false) refineField() else setStatus(label("refineOff", "Refine is off."))
             else -> {
                 var ch = primaryCode.toChar()
                 if (caps) ch = Character.toUpperCase(ch)
@@ -108,7 +148,7 @@ class TulmiKeyboardService : InputMethodService(), KeyboardView.OnKeyboardAction
             recorder = rec
             audioFile = file
             recording = true
-            setStatus("🎙️ Listening… tap mic to stop")
+            setStatus(label("listening", "🎙️ Listening… tap mic to stop"))
         } catch (e: Exception) {
             setStatus("Mic error: ${e.message}")
             cleanupRecorder()
@@ -127,7 +167,7 @@ class TulmiKeyboardService : InputMethodService(), KeyboardView.OnKeyboardAction
             setStatus("No audio captured.")
             return
         }
-        setStatus("Transcribing…")
+        setStatus(label("transcribing", "Transcribing…"))
         val target = targetAppName()
         Thread {
             try {
@@ -162,7 +202,7 @@ class TulmiKeyboardService : InputMethodService(), KeyboardView.OnKeyboardAction
             setStatus("Type something first, then tap ✨")
             return
         }
-        setStatus("Refining…")
+        setStatus(label("refining", "Refining…"))
         val target = targetAppName()
         Thread {
             try {

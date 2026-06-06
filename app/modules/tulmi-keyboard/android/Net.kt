@@ -26,6 +26,47 @@ object Net {
         .callTimeout(60, TimeUnit.SECONDS)
         .build()
 
+    /** Server-driven keyboard config (theme/labels/flags). Fetched + cached. */
+    data class KbConfig(
+        val background: String,
+        val keyText: String,
+        val accent: String,
+        val voice: Boolean,
+        val refine: Boolean,
+        val labels: Map<String, String>,
+    )
+
+    fun parseConfig(s: String): KbConfig {
+        val o = JSONObject(s)
+        val t = o.getJSONObject("theme")
+        val f = o.getJSONObject("features")
+        val l = o.getJSONObject("labels")
+        val labels = HashMap<String, String>()
+        for (k in l.keys()) labels[k] = l.getString(k)
+        return KbConfig(
+            background = t.optString("background", "#15151b"),
+            keyText = t.optString("keyText", "#ffffff"),
+            accent = t.optString("accent", "#5b4bff"),
+            voice = f.optBoolean("voice", true),
+            refine = f.optBoolean("refine", true),
+            labels = labels,
+        )
+    }
+
+    /** Returns the raw config JSON (so the caller can both apply and cache it). */
+    fun getKeyboardConfigJson(): String {
+        val req = Request.Builder()
+            .url("$baseUrl/v1/keyboard/config")
+            .addHeader("Authorization", "Bearer $TOKEN")
+            .get()
+            .build()
+        client.newCall(req).execute().use { res ->
+            val s = res.body?.string() ?: ""
+            if (!res.isSuccessful) throw RuntimeException("config ${res.code}: $s")
+            return s
+        }
+    }
+
     fun refine(text: String, targetApp: String): String {
         val json = JSONObject()
             .put("text", text)
