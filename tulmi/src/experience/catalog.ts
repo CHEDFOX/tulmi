@@ -9,6 +9,7 @@
  */
 import type {
   BootstrapResponse,
+  KeyboardConfigResponse,
   NavigationShell,
   Node,
   ScreenResponse,
@@ -45,7 +46,9 @@ const NAV: NavigationShell = {
   kind: "tabs",
   tabs: [
     { id: "home", title: "Home", screenId: "home" },
-    { id: "personality", title: "Personality", screenId: "personality" },
+    { id: "reply", title: "Reply", screenId: "reply" },
+    { id: "personality", title: "You", screenId: "personality" },
+    { id: "settings", title: "Settings", screenId: "settings" },
   ],
 };
 
@@ -82,8 +85,14 @@ export function buildScreen(screenId: string, ctx: ScreenContext): ScreenRespons
   switch (screenId) {
     case "home":
       return homeScreen();
+    case "reply":
+      return replyScreen();
     case "personality":
       return personalityScreen(ctx.personality);
+    case "settings":
+      return settingsScreen();
+    case "onboarding":
+      return onboardingScreen();
     default:
       return null;
   }
@@ -258,5 +267,199 @@ function personalityScreen(p: Personality): ScreenResponse {
       ],
     },
     cacheTtlSeconds: 0,
+  };
+}
+
+/** Reply helper — drafts a personalized reply via /v1/draft. */
+function replyScreen(): ScreenResponse {
+  return {
+    schemaVersion: SDUI_SCHEMA_VERSION,
+    screenId: "reply",
+    title: "Reply helper",
+    state: { screenContent: "", intent: "", busy: false, result: {} },
+    actions: {
+      draft: {
+        kind: "sequence",
+        actions: [
+          { kind: "setState", path: "busy", value: true },
+          {
+            kind: "callEndpoint",
+            method: "POST",
+            path: "/v1/draft",
+            body: {
+              screenContent: "$state.screenContent",
+              intent: "$state.intent",
+              targetApp: "WhatsApp",
+              language: "auto",
+            },
+            assignTo: "result",
+            onSuccess: "draftDone",
+            onError: "draftErr",
+          },
+        ],
+      },
+      draftDone: {
+        kind: "sequence",
+        actions: [
+          { kind: "setState", path: "busy", value: false },
+          { kind: "haptic", style: "success" },
+        ],
+      },
+      draftErr: {
+        kind: "sequence",
+        actions: [
+          { kind: "setState", path: "busy", value: false },
+          { kind: "toast", message: "Couldn't draft. Check ⚙ Connection + your key.", tone: "error" },
+        ],
+      },
+    },
+    root: {
+      type: "Screen",
+      children: [
+        text("Reply helper", "h1"),
+        text("Paste what you got, say what you mean — get a reply in your voice.", "muted"),
+        spacer(12),
+        text("What they wrote", "label"),
+        {
+          type: "TextField",
+          bind: { value: "screenContent" },
+          props: { placeholder: "Paste the message you received…", multiline: true },
+        },
+        spacer(12),
+        text("What you want to say", "label"),
+        {
+          type: "TextField",
+          bind: { value: "intent" },
+          props: { placeholder: "politely decline, suggest next week" },
+        },
+        spacer(12),
+        { type: "Button", props: { label: "Draft reply", variant: "primary" }, on: { onPress: "draft" } },
+        spacer(16),
+        { type: "ProgressBar", visibleIf: { truthy: "busy" } },
+        {
+          type: "Card",
+          visibleIf: { truthy: "result.draftText" },
+          motion: { appear: "fadeInUp" },
+          children: [text("", "body", { bind: { content: "result.draftText" } })],
+        },
+      ],
+    },
+    cacheTtlSeconds: 0,
+  };
+}
+
+/** Settings — server-driven app info, links, and a connection hint. */
+function settingsScreen(): ScreenResponse {
+  return {
+    schemaVersion: SDUI_SCHEMA_VERSION,
+    screenId: "settings",
+    title: "Settings",
+    state: {},
+    actions: {
+      openDocs: { kind: "openUrl", url: "https://github.com/CHEDFOX/tulmi", external: true },
+      reloadApp: { kind: "refresh" },
+    },
+    root: {
+      type: "Screen",
+      children: [
+        text("Settings", "h1"),
+        spacer(8),
+        {
+          type: "Card",
+          children: [
+            text("Tulmi", "body"),
+            text("Your voice + typing, made effortless. v0.1", "caption"),
+          ],
+        },
+        spacer(12),
+        text("Backend connection is set via the ⚙ button (top-right).", "muted"),
+        spacer(16),
+        { type: "Button", props: { label: "Open project on GitHub", variant: "secondary" }, on: { onPress: "openDocs" } },
+        spacer(8),
+        { type: "Button", props: { label: "Reload from server", variant: "secondary" }, on: { onPress: "reloadApp" } },
+        spacer(8),
+        { type: "Button", props: { label: "See what's new", variant: "secondary" }, on: { onPress: { kind: "navigate", screenId: "onboarding" } } },
+      ],
+    },
+    cacheTtlSeconds: 300,
+  };
+}
+
+/** Onboarding / welcome — a navigable screen demonstrating navigation. */
+function onboardingScreen(): ScreenResponse {
+  const step = (emoji: string, title: string, body: string): Node => ({
+    type: "Card",
+    style: { margin: 0 },
+    motion: { appear: "fadeInUp" },
+    children: [
+      text(`${emoji}  ${title}`, "body"),
+      spacer(4),
+      text(body, "caption"),
+    ],
+  });
+  return {
+    schemaVersion: SDUI_SCHEMA_VERSION,
+    screenId: "onboarding",
+    title: "Welcome",
+    state: {},
+    actions: { start: { kind: "switchTab", tabId: "home" } },
+    root: {
+      type: "Screen",
+      children: [
+        text("Welcome to Tulmi", "h1"),
+        text("Speak or type rough — Tulmi makes it sound like you.", "muted"),
+        spacer(16),
+        {
+          type: "Stack",
+          style: { direction: "column", gap: 10 },
+          children: [
+            step("🎙️", "Talk, don't type", "Tap the mic on the Tulmi keyboard and just speak."),
+            step("✨", "One-tap polish", "Refine turns messy text into clean, clear writing."),
+            step("💬", "Replies in your voice", "Paste a message, say your intent, get a perfect reply."),
+            step("🎚️", "Always you", "Set your tone once — every word matches your style."),
+          ],
+        },
+        spacer(20),
+        { type: "Button", props: { label: "Get started", variant: "primary" }, on: { onPress: "start" } },
+      ],
+    },
+    cacheTtlSeconds: 300,
+  };
+}
+
+// --- Keyboard config (server-driven keyboard; cached by the native shell) ----
+
+export function buildKeyboardConfig(): KeyboardConfigResponse {
+  return {
+    schemaVersion: SDUI_SCHEMA_VERSION,
+    theme: {
+      background: THEME.color.bg,
+      key: THEME.color.inputBg,
+      keyText: THEME.color.text,
+      accent: THEME.color.primary,
+      keyPressed: THEME.color.surface,
+    },
+    layouts: [
+      {
+        language: "en",
+        rows: [
+          ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+          ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+          ["{shift}", "z", "x", "c", "v", "b", "n", "m", "{backspace}"],
+          ["{globe}", "{mic}", "{refine}", "{space}", "{return}"],
+        ],
+      },
+    ],
+    features: { voice: true, refine: true, streaming: false },
+    labels: {
+      refine: "✨ Refine",
+      listening: "Listening… tap to stop",
+      transcribing: "Transcribing…",
+      refining: "Refining…",
+      space: "space",
+      return: "return",
+      needFullAccess: "Enable Full Access to use voice + Refine.",
+    },
+    cacheTtlSeconds: 600,
   };
 }

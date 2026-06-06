@@ -27,7 +27,7 @@ import {
   savePersonality,
   resolvePersonality,
 } from "./personality/store.js";
-import { buildBootstrap, buildScreen } from "./experience/catalog.js";
+import { buildBootstrap, buildScreen, buildKeyboardConfig } from "./experience/catalog.js";
 import type {
   AudioFormat,
   ClientMessage,
@@ -284,6 +284,12 @@ app.post("/v1/app/screen", async (req, reply) => {
     return reply.code(404).send({ code: "bad_request", message: `Unknown screen '${screenId}'` });
   }
   return reply.send(screen);
+});
+
+// --- Keyboard config (server-driven keyboard; cached by the native shell) ----
+
+app.get("/v1/keyboard/config", async (_req, reply) => {
+  return reply.send(buildKeyboardConfig());
 });
 
 // --- Voice (WebSocket): live streaming --------------------------------------
