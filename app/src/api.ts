@@ -8,6 +8,7 @@
  * source of truth). Keep them in sync.
  */
 import { getBaseUrl } from "./storage";
+import { getAccessToken } from "./auth/auth";
 
 export type LanguageHint = "auto" | "hi" | "en" | "hinglish" | string;
 export type TargetApp = string;
@@ -34,9 +35,9 @@ interface Options {
 }
 
 async function getToken(): Promise<string> {
-  // DEV_SKIP_AUTH on the backend accepts any token. Replace with the Supabase
-  // JWT once login is wired.
-  return "dev";
+  // The signed-in user's Supabase JWT. Falls back to "dev" so the app still
+  // works against a backend running with DEV_SKIP_AUTH=true (no session yet).
+  return (await getAccessToken()) ?? "dev";
 }
 
 async function authHeaders(): Promise<Record<string, string>> {

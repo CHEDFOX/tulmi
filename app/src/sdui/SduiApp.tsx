@@ -23,13 +23,16 @@ import type { Ctx, NavApi } from "./actions";
 import type { BootstrapResponse, ScreenResponse, ThemeTokens, UpdateGate } from "./types";
 import { DEFAULT_BASE_URL, getBaseUrl, setBaseUrl, getOnboarded, setOnboarded } from "../storage";
 import * as api from "../api";
+import AuthScreen from "../auth/AuthScreen";
+import { loadSession, onAuthChange } from "../auth/auth";
+import { SUPABASE_CONFIGURED } from "../auth/supabaseConfig";
 
 interface NavItem { screenId: string; params?: Record<string, any> }
 interface Toast { message: string; tone?: string }
 
 export default function SduiApp() {
   const [boot, setBoot] = useState<BootstrapResponse | null>(null);
-  const [phase, setPhase] = useState<"loading" | "ready" | "connect">("loading");
+  const [phase, setPhase] = useState<"loading" | "ready" | "connect" | "auth">("loading");
   const [tabId, setTabId] = useState("");
   const [stack, setStack] = useState<NavItem[]>([]);
   const [screen, setScreen] = useState<ScreenResponse | null>(null);
@@ -67,7 +70,18 @@ export default function SduiApp() {
   }, []);
 
   useEffect(() => {
-    loadBoot();
+    let unsub = () => {};
+    (async () => {
+      // Gate on auth first: the app needs a JWT to talk to the backend.
+      const session = await loadSession();
+      if (SUPABASE_CONFIGURED && !session) setPhase("auth");
+      else await loadBoot();
+      // React to sign-out from anywhere (e.g. Settings → Sign out).
+      unsub = onAuthChange((s) => {
+        if (!s && SUPABASE_CONFIGURED) setPhase("auth");
+      });
+    })();
+    return () => unsub();
   }, [loadBoot]);
 
   const current = stack[stack.length - 1];
@@ -109,6 +123,10 @@ export default function SduiApp() {
   }, [boot, screen]);
 
   // --- Render states --------------------------------------------------------
+
+  if (phase === "auth") {
+    return <AuthScreen onAuthed={loadBoot} />;
+  }
 
   if (phase === "connect" || showConnection) {
     return (

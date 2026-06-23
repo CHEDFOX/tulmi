@@ -6,6 +6,7 @@ import { Linking, Vibration } from "react-native";
 import type { ActionRef, ActionSpec, Condition } from "./types";
 import { Store } from "./state";
 import { callEndpoint } from "./client";
+import { signOut } from "../auth/auth";
 
 export interface NavApi {
   push: (screenId: string, params?: Record<string, any>) => void;
@@ -109,6 +110,10 @@ export async function runAction(ref: ActionRef | undefined, ctx: Ctx): Promise<v
       break;
     case "condition":
       await runAction(evalCondition(action.if, ctx) ? action.then : action.else, ctx);
+      break;
+    case "signOut":
+      // Clears the session; SduiApp's onAuthChange listener shows the gate.
+      await signOut();
       break;
     case "speak":
     case "playMedia":

@@ -9,8 +9,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getConfig } from "../config.js";
 
 let client: SupabaseClient | null = null;
+let verifier: SupabaseClient | null = null;
 
-/** Returns the service-role Supabase client, or null if Supabase is disabled. */
+/** Returns the service-role Supabase client, or null if metering is disabled. */
 export function supabase(): SupabaseClient | null {
   const cfg = getConfig();
   if (!cfg.supabaseEnabled) return null;
@@ -20,6 +21,23 @@ export function supabase(): SupabaseClient | null {
     });
   }
   return client;
+}
+
+/**
+ * A client used only to VERIFY user JWTs (calls /auth/v1/user with the token).
+ * Prefers the service key when present, else uses the public anon key — both can
+ * resolve a user from a token, so auth works without the secret service key.
+ */
+function verifyClient(): SupabaseClient | null {
+  const cfg = getConfig();
+  if (!cfg.authEnabled) return null;
+  if (!verifier) {
+    const key = cfg.SUPABASE_SERVICE_KEY ?? cfg.SUPABASE_ANON_KEY!;
+    verifier = createClient(cfg.SUPABASE_URL!, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  return verifier;
 }
 
 export interface AuthedUser {
@@ -45,7 +63,7 @@ export async function resolveUser(
     return { id: "dev-user", email: "dev@flow.local" };
   }
 
-  const sb = supabase();
+  const sb = verifyClient();
   if (!sb) return null;
 
   const token = authorization?.replace(/^Bearer\s+/i, "").trim();

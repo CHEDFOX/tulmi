@@ -99,6 +99,7 @@ export type ActionSpec =
   | { kind: "toast"; message: string; tone?: "info" | "success" | "error" }
   | { kind: "playMedia"; url: string }
   | { kind: "speak"; text: string }
+  | { kind: "signOut" }
   | { kind: "sequence"; actions: ActionRef[] }
   | { kind: "condition"; if: Condition; then: ActionRef; else?: ActionRef };
 

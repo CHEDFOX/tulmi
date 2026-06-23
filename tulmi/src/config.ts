@@ -71,8 +71,14 @@ const EnvSchema = z.object({
 });
 
 export type AppConfig = z.infer<typeof EnvSchema> & {
-  /** True only if Supabase is fully configured. */
+  /** True if Supabase is fully configured for metering (needs the service key). */
   supabaseEnabled: boolean;
+  /**
+   * True if we can verify user JWTs — needs the URL plus EITHER the service key
+   * OR the public anon key (verifying a token only calls /auth/v1/user, which
+   * the anon key is allowed to do). So real auth works without the secret key.
+   */
+  authEnabled: boolean;
 };
 
 let cached: AppConfig | null = null;
@@ -108,15 +114,19 @@ export function getConfig(): AppConfig {
   }
 
   const supabaseEnabled = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY);
+  const authEnabled = Boolean(
+    env.SUPABASE_URL && (env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY),
+  );
 
-  if (!supabaseEnabled && !env.DEV_SKIP_AUTH) {
+  if (!authEnabled && !env.DEV_SKIP_AUTH) {
     throw new Error(
-      "Supabase is not configured but DEV_SKIP_AUTH is false. " +
-        "Set SUPABASE_URL + SUPABASE_SERVICE_KEY, or set DEV_SKIP_AUTH=true for local testing.",
+      "Supabase auth is not configured but DEV_SKIP_AUTH is false. " +
+        "Set SUPABASE_URL + SUPABASE_ANON_KEY (or SUPABASE_SERVICE_KEY), " +
+        "or set DEV_SKIP_AUTH=true for local testing.",
     );
   }
 
-  cached = { ...env, supabaseEnabled };
+  cached = { ...env, supabaseEnabled, authEnabled };
   return cached;
 }
 

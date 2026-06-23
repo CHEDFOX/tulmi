@@ -4,6 +4,7 @@
  */
 import { Platform } from "react-native";
 import { getBaseUrl } from "../storage";
+import { getAccessToken } from "../auth/auth";
 import type { BootstrapResponse, ScreenResponse } from "./types";
 import { CORE_COMPONENTS, CORE_ACTIONS, CORE_TEMPLATES } from "./registry";
 
@@ -11,7 +12,8 @@ export const APP_VERSION = "1.0.0";
 const SDUI_SCHEMA_VERSION = 1;
 
 async function token(): Promise<string> {
-  return "dev"; // DEV_SKIP_AUTH; swap for a real JWT later
+  // Signed-in user's Supabase JWT; "dev" fallback for DEV_SKIP_AUTH backends.
+  return (await getAccessToken()) ?? "dev";
 }
 
 export function buildCapabilities() {

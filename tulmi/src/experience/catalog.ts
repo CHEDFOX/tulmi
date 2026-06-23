@@ -393,6 +393,7 @@ function settingsScreen(): ScreenResponse {
     actions: {
       openDocs: { kind: "openUrl", url: "https://github.com/CHEDFOX/tulmi", external: true },
       reloadApp: { kind: "refresh" },
+      signOut: { kind: "signOut" },
     },
     root: {
       type: "Screen",
@@ -415,6 +416,12 @@ function settingsScreen(): ScreenResponse {
         { type: "Button", props: { label: "Reload from server", variant: "secondary" }, on: { onPress: "reloadApp" } },
         spacer(8),
         { type: "Button", props: { label: "See what's new", variant: "secondary" }, on: { onPress: { kind: "navigate", screenId: "onboarding" } } },
+        spacer(20),
+        { type: "Divider" },
+        spacer(20),
+        text("Account", "label"),
+        spacer(8),
+        { type: "Button", props: { label: "Sign out", variant: "secondary" }, on: { onPress: "signOut" } },
       ],
     },
     cacheTtlSeconds: 300,

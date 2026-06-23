@@ -280,6 +280,7 @@ export type ActionSpec =
   | { kind: "toast"; message: string; tone?: "info" | "success" | "error" }
   | { kind: "playMedia"; url: string }
   | { kind: "speak"; text: string } // uses /v1/speak under the hood
+  | { kind: "signOut" } // clears the Supabase session; app returns to the auth gate
   // --- composition ---
   | { kind: "sequence"; actions: ActionRef[] }
   | { kind: "condition"; if: Condition; then: ActionRef; else?: ActionRef };
