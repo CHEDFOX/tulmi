@@ -17,8 +17,9 @@ import Fastify from "fastify";
 import multipart from "@fastify/multipart";
 import websocket from "@fastify/websocket";
 import { getConfig, VERSION } from "./config.js";
-import { resolveUser } from "./auth/supabase.js";
+import { resolveUser, type AuthedUser } from "./auth/supabase.js";
 import { recordUsage } from "./usage/metering.js";
+import { getProfile, updateProfile } from "./profile/store.js";
 import { runPipeline, runPipelineStream } from "./pipeline/index.js";
 import { clean, draftReply } from "./pipeline/cleanup.js";
 import { synthesize } from "./pipeline/tts.js";
@@ -119,9 +120,9 @@ app.post("/v1/transcribe-clean", async (req, reply) => {
   }
 
   try {
-    const personality = await resolvePersonality(user.id, personalityOverride);
+    const personality = await resolvePersonality(user, personalityOverride);
     const result = await runPipeline({ audio, format, targetApp, language, personality });
-    await recordUsage({ userId: user.id, source: "rest", ...result.usage });
+    await recordUsage({ user, source: "rest", ...result.usage });
     return reply.send(result);
   } catch (err) {
     req.log.error(err);
@@ -143,7 +144,7 @@ app.post("/v1/refine", async (req, reply) => {
   }
 
   try {
-    const personality = await resolvePersonality(user.id, body.personality);
+    const personality = await resolvePersonality(user, body.personality);
     const refinedText = await clean(body.text, {
       targetApp: body.targetApp,
       language: body.language,
@@ -154,7 +155,7 @@ app.post("/v1/refine", async (req, reply) => {
       words: countWords(refinedText),
       model: cfg.CLEANUP_MODEL,
     };
-    await recordUsage({ userId: user.id, source: "rest", ...usage });
+    await recordUsage({ user, source: "rest", ...usage });
     const res: RefineResponse = { refinedText, usage };
     return reply.send(res);
   } catch (err) {
@@ -177,7 +178,7 @@ app.post("/v1/draft", async (req, reply) => {
   }
 
   try {
-    const personality = await resolvePersonality(user.id, body.personality);
+    const personality = await resolvePersonality(user, body.personality);
     const draftText = await draftReply(
       body.screenContent ?? "",
       body.intent,
@@ -189,7 +190,7 @@ app.post("/v1/draft", async (req, reply) => {
       words: countWords(draftText),
       model: cfg.CLEANUP_MODEL,
     };
-    await recordUsage({ userId: user.id, source: "rest", ...usage });
+    await recordUsage({ user, source: "rest", ...usage });
     const res: DraftResponse = { draftText, usage };
     return reply.send(res);
   } catch (err) {
@@ -219,7 +220,7 @@ app.post("/v1/speak", async (req, reply) => {
       instructions: body.instructions,
     });
     await recordUsage({
-      userId: user.id,
+      user,
       source: "rest",
       audioSeconds: 0,
       words: countWords(body.text),
@@ -239,7 +240,7 @@ app.get("/v1/personality", async (req, reply) => {
   if (!user) {
     return reply.code(401).send({ code: "unauthorized", message: "Missing or invalid token" });
   }
-  const personality = await getPersonality(user.id);
+  const personality = await getPersonality(user);
   const res: PersonalityResponse = { personality };
   return reply.send(res);
 });
@@ -251,7 +252,7 @@ app.put("/v1/personality", async (req, reply) => {
   }
   const personality = (req.body ?? {}) as Personality;
   try {
-    await savePersonality(user.id, personality);
+    await savePersonality(user, personality);
     const res: PersonalityResponse = { personality };
     return reply.send(res);
   } catch (err) {
@@ -265,8 +266,12 @@ app.put("/v1/personality", async (req, reply) => {
 // The app is a generic renderer; these endpoints decide what it draws. Auth is
 // optional here so the shell can boot pre-login (personality is empty for guests).
 
-app.post("/v1/app/bootstrap", async (_req, reply) => {
-  return reply.send(buildBootstrap());
+app.post("/v1/app/bootstrap", async (req, reply) => {
+  // Auth is optional here so the shell can boot; when present, the user's
+  // profile decides whether onboarding still needs to run.
+  const user = await resolveUser(req.headers["authorization"]);
+  const profile = user ? await getProfile(user) : null;
+  return reply.send(buildBootstrap({ onboarded: profile?.onboarded ?? false }));
 });
 
 app.post("/v1/app/screen", async (req, reply) => {
@@ -277,13 +282,46 @@ app.post("/v1/app/screen", async (req, reply) => {
   }
 
   const user = await resolveUser(req.headers["authorization"]);
-  const personality = user ? await getPersonality(user.id) : {};
+  const [personality, profile] = user
+    ? await Promise.all([getPersonality(user), getProfile(user)])
+    : [{}, null];
 
-  const screen = buildScreen(screenId, { personality });
+  const screen = buildScreen(screenId, {
+    personality,
+    language: profile?.language ?? "auto",
+    email: user?.email,
+  });
   if (!screen) {
     return reply.code(404).send({ code: "bad_request", message: `Unknown screen '${screenId}'` });
   }
   return reply.send(screen);
+});
+
+// --- Profile (REST): language + onboarding state ----------------------------
+
+app.get("/v1/profile", async (req, reply) => {
+  const user = await resolveUser(req.headers["authorization"]);
+  if (!user) {
+    return reply.code(401).send({ code: "unauthorized", message: "Missing or invalid token" });
+  }
+  return reply.send(await getProfile(user));
+});
+
+app.put("/v1/profile", async (req, reply) => {
+  const user = await resolveUser(req.headers["authorization"]);
+  if (!user) {
+    return reply.code(401).send({ code: "unauthorized", message: "Missing or invalid token" });
+  }
+  const body = (req.body ?? {}) as { language?: string; onboarded?: boolean };
+  const patch: { language?: string; onboarded?: boolean } = {};
+  if (typeof body.language === "string") patch.language = body.language;
+  if (typeof body.onboarded === "boolean") patch.onboarded = body.onboarded;
+  try {
+    return reply.send(await updateProfile(user, patch));
+  } catch (err) {
+    req.log.error(err);
+    return reply.code(500).send({ code: "internal", message: "Failed to save profile" });
+  }
 });
 
 // --- Keyboard config (server-driven keyboard; cached by the native shell) ----
@@ -304,7 +342,7 @@ app.register(async (instance) => {
     let language: LanguageHint | undefined;
     let personalityOverride: Personality | undefined;
     const chunks: Buffer[] = [];
-    let userId: string | null = null;
+    let authedUser: AuthedUser | null = null;
 
     // Verify auth on connect (header carried through the upgrade request).
     resolveUser(req.headers["authorization"]).then((user) => {
@@ -313,7 +351,7 @@ app.register(async (instance) => {
         socket.close();
         return;
       }
-      userId = user.id;
+      authedUser = user;
     });
 
     socket.on("message", async (data: Buffer, isBinary: boolean) => {
@@ -343,7 +381,8 @@ app.register(async (instance) => {
       }
 
       if (msg.type === "end") {
-        if (!userId) {
+        const user = authedUser;
+        if (!user) {
           send({ type: "error", code: "unauthorized", message: "Not authenticated" });
           return;
         }
@@ -353,7 +392,7 @@ app.register(async (instance) => {
         }
         const audio = Buffer.concat(chunks);
         try {
-          const personality = await resolvePersonality(userId, personalityOverride);
+          const personality = await resolvePersonality(user, personalityOverride);
           for await (const ev of runPipelineStream({
             audio,
             format,
@@ -363,7 +402,7 @@ app.register(async (instance) => {
           })) {
             send(ev);
             if (ev.type === "done") {
-              await recordUsage({ userId, source: "stream", ...ev.usage });
+              await recordUsage({ user, source: "stream", ...ev.usage });
             }
           }
         } catch (err) {

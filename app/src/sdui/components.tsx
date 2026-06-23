@@ -61,6 +61,7 @@ export function resolveStyle(style: Record<string, any> | undefined, theme: Them
   if (s.direction) out.flexDirection = s.direction;
   if (s.align) out.alignItems = ALIGN[s.align];
   if (s.justify) out.justifyContent = JUSTIFY[s.justify];
+  if (s.wrap) out.flexWrap = "wrap";
   if (s.gap != null) out.gap = tok(s.gap, theme);
   if (s.padding != null) out.padding = tok(s.padding, theme);
   if (s.margin != null) out.margin = tok(s.margin, theme);

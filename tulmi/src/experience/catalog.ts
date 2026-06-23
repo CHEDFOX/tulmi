@@ -67,12 +67,14 @@ const spacer = (height: number): Node => ({ type: "Spacer", style: { height } })
 
 // --- Bootstrap --------------------------------------------------------------
 
-export function buildBootstrap(): BootstrapResponse {
+export function buildBootstrap(opts: { onboarded?: boolean } = {}): BootstrapResponse {
   return {
     schemaVersion: SDUI_SCHEMA_VERSION,
     theme: THEME,
     navigation: NAV,
-    initialScreenId: "home",
+    // The server owns onboarding: first-run users land on the flow; everyone
+    // else goes straight to the app.
+    initialScreenId: opts.onboarded ? "home" : "onboarding",
     flags: {},
     // Central copy — every screen can reference these with "@key".
     labels: {
@@ -105,6 +107,8 @@ export function buildBootstrap(): BootstrapResponse {
 
 export interface ScreenContext {
   personality: Personality;
+  language: string;
+  email?: string;
 }
 
 export function buildScreen(screenId: string, ctx: ScreenContext): ScreenResponse | null {
@@ -116,13 +120,29 @@ export function buildScreen(screenId: string, ctx: ScreenContext): ScreenRespons
     case "personality":
       return personalityScreen(ctx.personality);
     case "settings":
-      return settingsScreen();
+      return settingsScreen(ctx);
     case "onboarding":
-      return onboardingScreen();
+      return onboardingWelcome();
+    case "onboarding_language":
+      return onboardingLanguage(ctx.language);
+    case "onboarding_keyboard":
+      return onboardingKeyboard();
     default:
       return null;
   }
 }
+
+/** Languages offered in onboarding + settings. */
+const LANGUAGES: Array<{ value: string; label: string }> = [
+  { value: "auto", label: "Auto-detect" },
+  { value: "en", label: "English" },
+  { value: "hi", label: "Hindi" },
+  { value: "hinglish", label: "Hinglish" },
+  { value: "es", label: "Spanish" },
+  { value: "fr", label: "French" },
+  { value: "ar", label: "Arabic" },
+  { value: "pt", label: "Portuguese" },
+];
 
 /** The refine playground — proves the full SDUI loop incl. a brain call. */
 function homeScreen(): ScreenResponse {
@@ -383,13 +403,28 @@ function replyScreen(): ScreenResponse {
   };
 }
 
-/** Settings — server-driven app info, links, and a connection hint. */
-function settingsScreen(): ScreenResponse {
+/** Settings — server-driven app info, account, language, and links. */
+function settingsScreen(ctx: ScreenContext): ScreenResponse {
+  const langChip = (l: { value: string; label: string }): Node => ({
+    type: "Chip",
+    props: { label: l.label, group: "language", value: l.value },
+    on: {
+      onPress: {
+        kind: "sequence",
+        actions: [
+          { kind: "haptic", style: "selection" },
+          { kind: "callEndpoint", method: "PUT", path: "/v1/profile", body: { language: l.value } },
+          { kind: "toast", message: `Language set to ${l.label}`, tone: "success" },
+        ],
+      },
+    },
+  });
+
   return {
     schemaVersion: SDUI_SCHEMA_VERSION,
     screenId: "settings",
     title: "Settings",
-    state: {},
+    state: { language: ctx.language },
     actions: {
       openDocs: { kind: "openUrl", url: "https://github.com/CHEDFOX/tulmi", external: true },
       reloadApp: { kind: "refresh" },
@@ -404,18 +439,33 @@ function settingsScreen(): ScreenResponse {
         {
           type: "Card",
           children: [
-            text("Tulmi", "body"),
-            text("Your voice + typing, made effortless. v0.1", "caption"),
+            text("Signed in", "label"),
+            text(ctx.email ?? "Your account", "body"),
           ],
         },
-        spacer(12),
+
+        spacer(20),
+        text("Language", "label"),
+        { type: "Paragraph", props: { content: "What you mostly speak and type. Tulmi adapts to this." }, style: { marginBottom: 10 } },
+        {
+          type: "Stack",
+          style: { direction: "row", gap: 8, wrap: "wrap" },
+          children: LANGUAGES.map(langChip),
+        },
+
+        spacer(20),
+        { type: "Divider" },
+        spacer(20),
+        text("App", "label"),
+        spacer(8),
         text("Backend connection is set via the ⚙ button (top-right).", "muted"),
-        spacer(16),
+        spacer(12),
         { type: "Button", props: { label: "Open project on GitHub", variant: "secondary" }, on: { onPress: "openDocs" } },
         spacer(8),
         { type: "Button", props: { label: "Reload from server", variant: "secondary" }, on: { onPress: "reloadApp" } },
         spacer(8),
-        { type: "Button", props: { label: "See what's new", variant: "secondary" }, on: { onPress: { kind: "navigate", screenId: "onboarding" } } },
+        { type: "Button", props: { label: "See the intro again", variant: "secondary" }, on: { onPress: { kind: "navigate", screenId: "onboarding" } } },
+
         spacer(20),
         { type: "Divider" },
         spacer(20),
@@ -424,18 +474,28 @@ function settingsScreen(): ScreenResponse {
         { type: "Button", props: { label: "Sign out", variant: "secondary" }, on: { onPress: "signOut" } },
       ],
     },
-    cacheTtlSeconds: 300,
+    cacheTtlSeconds: 0,
   };
 }
 
 /**
- * Onboarding — built with the "feature" TEMPLATE + content BLOCKS (not a raw
- * tree). Demonstrates SDUI v2: named templates, @label refs, and the new blocks
- * (Hero, Badge, KeyValue, Paragraph). The app composes the layout from `blocks`.
+ * Onboarding is a server-driven, multi-step flow:
+ *   onboarding (welcome) → onboarding_language → onboarding_keyboard → home
+ * Each step is its own screen; the server saves choices to the user's profile,
+ * so completion is remembered server-side (not just on the device).
  */
-function onboardingScreen(): ScreenResponse {
-  // One feature line: a quiet title row + a body paragraph, airy gap between.
-  const step = (title: string, body: string): Node => ({
+
+/** A small step header used across the onboarding flow. */
+function stepHeader(step: number, total: number, overline: string): Node[] {
+  return [
+    { type: "Spacer", style: { height: 20 } },
+    { type: "Overline", props: { content: `${overline} · Step ${step} of ${total}` }, style: { textAlign: "center" } },
+  ];
+}
+
+/** Step 1 — welcome + what Tulmi does. */
+function onboardingWelcome(): ScreenResponse {
+  const feature = (title: string, body: string): Node => ({
     type: "Stack",
     style: { direction: "column", gap: 4 },
     motion: { appear: "fadeInUp" },
@@ -450,26 +510,111 @@ function onboardingScreen(): ScreenResponse {
     title: "Welcome",
     template: "scroll",
     state: {},
-    actions: { start: { kind: "switchTab", tabId: "home" } },
+    actions: { next: { kind: "navigate", screenId: "onboarding_language" } },
     blocks: [
-      { type: "Spacer", style: { height: 28 } },
-      { type: "Overline", props: { content: "Voice · Refine · Reply" }, style: { textAlign: "center" } },
+      ...stepHeader(1, 3, "Welcome"),
       { type: "Heading", props: { content: "@onboarding.title" }, style: { textAlign: "center", fontSize: 30, lineHeight: 38, marginBottom: 12 } },
       { type: "Paragraph", props: { content: "@onboarding.subtitle" }, style: { textAlign: "center", marginBottom: 36 } },
       {
         type: "Stack",
         style: { direction: "column", gap: 22 },
         children: [
-          step("🎙️  Talk, don't type", "Tap the mic on the Tulmi keyboard and just speak."),
-          step("✨  One-tap polish", "Refine turns messy text into clean, clear writing."),
-          step("💬  Replies in your voice", "Paste a message, say your intent, get a perfect reply."),
-          step("🎚️  Always you", "Set your tone once — every word matches your style."),
+          feature("🎙️  Talk, don't type", "Tap the mic on the Tulmi keyboard and just speak."),
+          feature("✨  One-tap polish", "Refine turns messy text into clean, clear writing."),
+          feature("💬  Replies in your voice", "Paste a message, say your intent, get a perfect reply."),
+          feature("🎚️  Always you", "Set your tone once — every word matches your style."),
         ],
       },
       { type: "Spacer", style: { height: 40 } },
-      { type: "Button", props: { label: "@onboarding.cta", variant: "primary" }, on: { onPress: "start" } },
+      { type: "Button", props: { label: "Continue", variant: "primary" }, on: { onPress: "next" } },
     ],
-    cacheTtlSeconds: 300,
+    cacheTtlSeconds: 0,
+  };
+}
+
+/** Step 2 — pick the main language; saved to the profile on Continue. */
+function onboardingLanguage(current: string): ScreenResponse {
+  const chip = (l: { value: string; label: string }): Node => ({
+    type: "Chip",
+    props: { label: l.label, group: "language", value: l.value },
+    on: { onPress: { kind: "haptic", style: "selection" } },
+  });
+  return {
+    schemaVersion: SDUI_SCHEMA_VERSION,
+    screenId: "onboarding_language",
+    title: "Language",
+    template: "scroll",
+    state: { language: current || "auto" },
+    actions: {
+      next: {
+        kind: "sequence",
+        actions: [
+          { kind: "callEndpoint", method: "PUT", path: "/v1/profile", body: { language: "$state.language" } },
+          { kind: "navigate", screenId: "onboarding_keyboard" },
+        ],
+      },
+    },
+    blocks: [
+      ...stepHeader(2, 3, "Your language"),
+      { type: "Heading", props: { content: "What do you mostly speak?" }, style: { textAlign: "center", fontSize: 26, lineHeight: 32, marginBottom: 10 } },
+      { type: "Paragraph", props: { content: "Tulmi works in many languages. Pick your main one — you can change it anytime in Settings." }, style: { textAlign: "center", marginBottom: 28 } },
+      {
+        type: "Stack",
+        style: { direction: "row", gap: 8, wrap: "wrap", justify: "center" },
+        children: LANGUAGES.map(chip),
+      },
+      { type: "Spacer", style: { height: 40 } },
+      { type: "Button", props: { label: "Continue", variant: "primary" }, on: { onPress: "next" } },
+    ],
+    cacheTtlSeconds: 0,
+  };
+}
+
+/** Step 3 — enable the Tulmi keyboard, then finish (marks onboarded). */
+function onboardingKeyboard(): ScreenResponse {
+  const row = (n: string, body: string): Node => ({
+    type: "Stack",
+    style: { direction: "row", gap: 12 },
+    children: [
+      { type: "Text", props: { content: n }, style: { color: "$color.primary", fontSize: 16, fontWeight: "700" } },
+      { type: "Paragraph", props: { content: body }, style: { marginBottom: 0, flex: 1 } },
+    ],
+  });
+  return {
+    schemaVersion: SDUI_SCHEMA_VERSION,
+    screenId: "onboarding_keyboard",
+    title: "Enable keyboard",
+    template: "scroll",
+    state: {},
+    actions: {
+      finish: {
+        kind: "sequence",
+        actions: [
+          { kind: "callEndpoint", method: "PUT", path: "/v1/profile", body: { onboarded: true } },
+          { kind: "haptic", style: "success" },
+          { kind: "switchTab", tabId: "home" },
+        ],
+      },
+    },
+    blocks: [
+      ...stepHeader(3, 3, "Keyboard"),
+      { type: "Heading", props: { content: "Turn on the Tulmi keyboard" }, style: { textAlign: "center", fontSize: 26, lineHeight: 32, marginBottom: 10 } },
+      { type: "Paragraph", props: { content: "The Tulmi keyboard adds voice + ✨ Refine inside every app — WhatsApp, email, anywhere you type." }, style: { textAlign: "center", marginBottom: 28 } },
+      {
+        type: "Card",
+        children: [
+          row("1", "Open your phone's Settings → System → Languages & input → On-screen keyboard."),
+          { type: "Spacer", style: { height: 12 } },
+          row("2", "Enable “Tulmi”, then set it as your keyboard (tap the 🌐 globe key to switch)."),
+          { type: "Spacer", style: { height: 12 } },
+          row("3", "Allow Full Access so voice + Refine can reach the server."),
+        ],
+      },
+      { type: "Paragraph", props: { content: "You can do this later too — it’s in Settings whenever you’re ready." }, style: { textAlign: "center", marginTop: 20 } },
+      { type: "Spacer", style: { height: 32 } },
+      { type: "Button", props: { label: "Finish — start using Tulmi", variant: "primary" }, on: { onPress: "finish" } },
+    ],
+    cacheTtlSeconds: 0,
   };
 }
 

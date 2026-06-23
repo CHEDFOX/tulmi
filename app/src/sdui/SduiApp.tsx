@@ -21,7 +21,7 @@ import { Store } from "./state";
 import { composeTemplate } from "./templates";
 import type { Ctx, NavApi } from "./actions";
 import type { BootstrapResponse, ScreenResponse, ThemeTokens, UpdateGate } from "./types";
-import { DEFAULT_BASE_URL, getBaseUrl, setBaseUrl, getOnboarded, setOnboarded } from "../storage";
+import { DEFAULT_BASE_URL, getBaseUrl, setBaseUrl } from "../storage";
 import * as api from "../api";
 import AuthScreen from "../auth/AuthScreen";
 import { loadSession, onAuthChange } from "../auth/auth";
@@ -54,14 +54,9 @@ export default function SduiApp() {
       setBoot(b);
       const firstTab = b.navigation.kind === "tabs" ? b.navigation.tabs[0]?.id ?? "" : "";
       setTabId(firstTab);
-      // First run → show onboarding once; afterwards go straight to the app.
-      const onboarded = await getOnboarded();
-      if (!onboarded) {
-        setStack([{ screenId: "onboarding" }]);
-        void setOnboarded();
-      } else {
-        setStack([{ screenId: b.initialScreenId }]);
-      }
+      // The server owns onboarding: initialScreenId is "onboarding" until the
+      // user's profile is marked onboarded, then "home".
+      setStack([{ screenId: b.initialScreenId }]);
       setShowConnection(false);
       setPhase("ready");
     } catch {

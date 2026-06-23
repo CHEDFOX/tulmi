@@ -43,6 +43,32 @@ function verifyClient(): SupabaseClient | null {
 export interface AuthedUser {
   id: string;
   email?: string;
+  /** The raw Supabase JWT, used to build a RLS-scoped data client. */
+  token?: string;
+}
+
+/**
+ * A Supabase client scoped to ONE user via their JWT. Queries run as that user,
+ * so Row-Level Security applies (auth.uid() = user_id). This is what lets the
+ * backend persist data with just the public anon key — no service-role secret.
+ */
+export function userClient(token: string | undefined): SupabaseClient | null {
+  const cfg = getConfig();
+  if (!cfg.authEnabled || !token) return null;
+  const key = cfg.SUPABASE_ANON_KEY ?? cfg.SUPABASE_SERVICE_KEY!;
+  return createClient(cfg.SUPABASE_URL!, key, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+/**
+ * The best data client for a user: the service-role admin client when it's
+ * configured (bypasses RLS), else a JWT-scoped client (honours RLS). Returns
+ * null only when neither is available (DEV_SKIP_AUTH → callers use memory).
+ */
+export function dataClientFor(user: AuthedUser): SupabaseClient | null {
+  return supabase() ?? userClient(user.token);
 }
 
 /**
@@ -72,5 +98,5 @@ export async function resolveUser(
   const { data, error } = await sb.auth.getUser(token);
   if (error || !data.user) return null;
 
-  return { id: data.user.id, email: data.user.email ?? undefined };
+  return { id: data.user.id, email: data.user.email ?? undefined, token };
 }
