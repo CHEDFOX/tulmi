@@ -7,6 +7,7 @@ import React, { createContext, useContext, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -22,6 +23,13 @@ import {
 import type { Node, NodeEvent, ThemeTokens } from "./types";
 import { Store, getPath } from "./state";
 import * as api from "../api";
+
+/**
+ * Display serif for headings (Plutto uses PlayfairDisplay). We use the platform
+ * serif so it works with no bundled font; swap for @expo-google-fonts/playfair
+ * later to match exactly. The backend can also override via theme.font.family.
+ */
+const SERIF = Platform.select({ ios: "Georgia", android: "serif", default: "serif" });
 
 // --- Theme context ----------------------------------------------------------
 
@@ -72,13 +80,24 @@ export function resolveStyle(style: Record<string, any> | undefined, theme: Them
 
 function textVariant(variant: string | undefined, theme: ThemeTokens): any {
   const f = theme.font.sizes;
+  const fam = theme.font.family ?? SERIF;
   switch (variant) {
-    case "h1": return { color: theme.color.text, fontSize: f.h1, fontWeight: theme.font.weights.heavy };
-    case "brand": return { color: theme.color.text, fontSize: f.brand, fontWeight: theme.font.weights.heavy };
-    case "label": return { color: theme.color.label, fontSize: f.label, marginBottom: 6 };
-    case "muted": return { color: theme.color.muted, fontSize: f.label, lineHeight: 19 };
-    case "caption": return { color: theme.color.muted, fontSize: f.caption };
-    default: return { color: theme.color.text, fontSize: f.body, lineHeight: 22 };
+    case "brand":
+      return { fontFamily: fam, color: theme.color.text, fontSize: f.brand, lineHeight: 38, letterSpacing: 0.2 };
+    case "h1":
+      return { fontFamily: fam, color: theme.color.text, fontSize: f.h1, lineHeight: 34, letterSpacing: 0.3 };
+    case "overline":
+      return { color: theme.color.label, fontSize: f.overline, letterSpacing: 3, fontWeight: "500", textTransform: "uppercase", marginBottom: 10 };
+    case "quote":
+      return { fontFamily: fam, color: theme.color.muted ?? theme.color.text, fontSize: f.lg, lineHeight: 28, fontStyle: "italic" };
+    case "label":
+      return { color: theme.color.label, fontSize: f.label, letterSpacing: 1, marginBottom: 8 };
+    case "muted":
+      return { color: theme.color.muted, fontSize: f.body, lineHeight: 22 };
+    case "caption":
+      return { color: theme.color.muted, fontSize: f.caption };
+    default: // body
+      return { color: theme.color.body ?? theme.color.text, fontSize: f.body, lineHeight: 26, fontWeight: "300" };
   }
 }
 
@@ -100,7 +119,14 @@ const Screen = ({ children, style }: CompProps) => {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: theme.color.bg }}
-      contentContainerStyle={[{ padding: theme.space.lg }, style]}
+      contentContainerStyle={[
+        {
+          paddingHorizontal: theme.space.content ?? theme.space.lg,
+          paddingTop: theme.space.contentTop ?? theme.space.lg,
+          paddingBottom: 120, // airy scroll buffer (clears the tab bar)
+        },
+        style,
+      ]}
       keyboardShouldPersistTaps="handled"
     >
       {children}
@@ -136,11 +162,11 @@ const Button = ({ props, style, fire }: CompProps) => {
       onPress={() => fire("onPress")}
       disabled={props.disabled}
       style={({ pressed }) => [
-        { backgroundColor: bg, borderRadius: theme.radius.md, paddingVertical: 13, alignItems: "center", opacity: props.disabled ? 0.5 : pressed ? 0.85 : 1 },
+        { backgroundColor: bg, borderRadius: theme.radius.pill, paddingVertical: 16, alignItems: "center", opacity: props.disabled ? 0.5 : pressed ? 0.85 : 1 },
         style,
       ]}
     >
-      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{props.label}</Text>
+      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15, letterSpacing: 0.5 }}>{props.label}</Text>
     </Pressable>
   );
 };
@@ -219,22 +245,35 @@ const ListPlaceholder = ({ children }: CompProps) => <View>{children}</View>;
 
 // --- SDUI v2 content blocks -------------------------------------------------
 
+// Tiny uppercase kicker above a heading (the Plutto "overline").
+const Overline = ({ props, style }: CompProps) => {
+  const theme = useTheme();
+  return <Text style={[{ color: theme.color.label, fontSize: theme.font.sizes.overline, letterSpacing: 3, fontWeight: "500", textTransform: "uppercase", marginBottom: 10 }, style]}>{props.content ?? ""}</Text>;
+};
+
 const Heading = ({ props, style }: CompProps) => {
   const theme = useTheme();
-  return <Text style={[{ color: theme.color.text, fontSize: theme.font.sizes.h1, fontWeight: "800", marginBottom: 4 }, style]}>{props.content ?? ""}</Text>;
+  const fam = theme.font.family ?? SERIF;
+  return <Text style={[{ fontFamily: fam, color: theme.color.text, fontSize: theme.font.sizes.h1, lineHeight: 34, letterSpacing: 0.3, marginBottom: 24 }, style]}>{props.content ?? ""}</Text>;
 };
 
 const Paragraph = ({ props, style }: CompProps) => {
   const theme = useTheme();
-  return <Text style={[{ color: theme.color.muted, fontSize: theme.font.sizes.body, lineHeight: 22, marginBottom: 8 }, style]}>{props.content ?? ""}</Text>;
+  return <Text style={[{ color: theme.color.body ?? theme.color.text, fontSize: theme.font.sizes.body, lineHeight: 26, fontWeight: "300", marginBottom: 18 }, style]}>{props.content ?? ""}</Text>;
+};
+
+const Quote = ({ props, style }: CompProps) => {
+  const theme = useTheme();
+  const fam = theme.font.family ?? SERIF;
+  return <Text style={[{ fontFamily: fam, color: theme.color.muted, fontSize: theme.font.sizes.lg, lineHeight: 28, fontStyle: "italic", textAlign: "center", marginVertical: 16 }, style]}>{props.content ?? ""}</Text>;
 };
 
 const Badge = ({ props, style }: CompProps) => {
   const theme = useTheme();
-  const tone = props.tone === "accent" ? theme.color.primary : theme.color.muted;
+  const tone = props.tone === "accent" ? theme.color.primary : theme.color.label;
   return (
-    <View style={[{ alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, borderRadius: theme.radius.pill, borderWidth: 1, borderColor: tone }, style]}>
-      <Text style={{ color: tone, fontSize: theme.font.sizes.caption, fontWeight: "700" }}>{props.label ?? ""}</Text>
+    <View style={[{ alignSelf: "flex-start", paddingHorizontal: 11, paddingVertical: 5, borderRadius: theme.radius.pill, borderWidth: 1, borderColor: tone, marginBottom: 24 }, style]}>
+      <Text style={{ color: tone, fontSize: theme.font.sizes.overline, fontWeight: "500", letterSpacing: 2.5, textTransform: "uppercase" }}>{props.label ?? ""}</Text>
     </View>
   );
 };
@@ -336,5 +375,5 @@ const VoiceButton = ({ node, props, style, store, fire }: CompProps) => {
 export const REGISTRY: Record<string, React.ComponentType<CompProps>> = {
   Screen, Stack, Spacer, Text: TextC, Image: ImageC, Icon, Button,
   TextField, Chip, Card, Divider, ProgressBar, List: ListPlaceholder, VoiceButton,
-  Heading, Paragraph, Badge, KeyValue, Hero,
+  Overline, Heading, Paragraph, Quote, Badge, KeyValue, Hero,
 };

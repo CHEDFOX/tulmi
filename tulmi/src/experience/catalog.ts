@@ -22,23 +22,26 @@ import type { Personality } from "../../../shared/types/api.js";
 
 export const THEME: ThemeTokens = {
   color: {
-    bg: "#0e0e12",
-    surface: "#15151b",
-    card: "#12121a",
-    inputBg: "#1c1c25",
-    border: "#2a2a36",
-    primary: "#5b4bff",
-    text: "#ffffff",
-    muted: "#8a8a96",
-    label: "#cfcfe0",
-    danger: "#c0392b",
+    bg: "#0a0a0d", // near-black
+    surface: "#101015",
+    card: "#121219",
+    inputBg: "#16161d",
+    border: "rgba(255,255,255,0.10)",
+    primary: "#5b4bff", // Tulmi accent (swap from the backend anytime)
+    text: "rgba(255,255,255,0.94)", // headings / primary text
+    body: "rgba(255,255,255,0.72)", // body prose
+    muted: "rgba(255,255,255,0.55)", // secondary
+    label: "rgba(255,255,255,0.38)", // overlines / faint labels
+    danger: "#e0556b",
     success: "#4caf50",
   },
-  space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 },
-  radius: { sm: 6, md: 10, pill: 999 },
+  // Plutto-style scale: airy, editorial.
+  space: { xs: 4, sm: 8, md: 12, lg: 18, xl: 26, content: 24, contentTop: 34 },
+  radius: { sm: 8, md: 14, card: 18, pill: 999 },
   font: {
-    sizes: { caption: 12, label: 13, body: 15, h1: 20, brand: 24 },
-    weights: { regular: "400", bold: "700", heavy: "800" },
+    // Headings render in a serif (set per-platform in the renderer); body is sans.
+    sizes: { overline: 11, caption: 12, label: 13, body: 15, lg: 18, h1: 24, brand: 30 },
+    weights: { light: "300", regular: "400", medium: "500", bold: "700", heavy: "800" },
   },
 };
 
@@ -167,10 +170,10 @@ function homeScreen(): ScreenResponse {
     root: {
       type: "Screen",
       children: [
-        text("Playground", "h1"),
-        text("Type something rough, then let Tulmi polish it.", "muted"),
-        spacer(12),
-        text("Your text", "label"),
+        { type: "Overline", props: { content: "Playground" } },
+        { type: "Heading", props: { content: "Make it sound like you" } },
+        { type: "Paragraph", props: { content: "Type something rough, then ✨ Refine — or just speak it." }, style: { marginBottom: 22 } },
+        { type: "Text", props: { content: "Your text", variant: "label" } },
         {
           type: "TextField",
           bind: { value: "input" },
@@ -253,9 +256,9 @@ function personalityScreen(p: Personality): ScreenResponse {
     root: {
       type: "Screen",
       children: [
+        { type: "Overline", props: { content: "Your voice" } },
         text("Your personality", "h1"),
-        text("Set once — applied to everything Tulmi writes for you.", "muted"),
-        spacer(12),
+        { type: "Paragraph", props: { content: "Set once — applied to everything Tulmi writes for you." }, style: { marginBottom: 20 } },
 
         text("Tone", "label"),
         { type: "TextField", bind: { value: "form.tone" }, props: { placeholder: "warm and concise, a little witty" } },
@@ -348,9 +351,9 @@ function replyScreen(): ScreenResponse {
     root: {
       type: "Screen",
       children: [
+        { type: "Overline", props: { content: "Reply" } },
         text("Reply helper", "h1"),
-        text("Paste what you got, say what you mean — get a reply in your voice.", "muted"),
-        spacer(12),
+        { type: "Paragraph", props: { content: "Paste what you got, say what you mean — get a reply in your voice." }, style: { marginBottom: 20 } },
         text("What they wrote", "label"),
         {
           type: "TextField",
@@ -394,6 +397,7 @@ function settingsScreen(): ScreenResponse {
     root: {
       type: "Screen",
       children: [
+        { type: "Overline", props: { content: "Tulmi" } },
         text("Settings", "h1"),
         spacer(8),
         {
@@ -423,42 +427,39 @@ function settingsScreen(): ScreenResponse {
  * (Hero, Badge, KeyValue, Paragraph). The app composes the layout from `blocks`.
  */
 function onboardingScreen(): ScreenResponse {
-  const step = (emoji: string, title: string, body: string): Node => ({
-    type: "Card",
+  // One feature line: a quiet title row + a body paragraph, airy gap between.
+  const step = (title: string, body: string): Node => ({
+    type: "Stack",
+    style: { direction: "column", gap: 4 },
     motion: { appear: "fadeInUp" },
     children: [
-      { type: "Heading", props: { content: `${emoji}  ${title}` }, style: { fontSize: 16 } },
-      { type: "Paragraph", props: { content: body } },
+      { type: "Text", props: { content: title }, style: { color: "$color.text", fontSize: 16, fontWeight: "500", letterSpacing: 0.3 } },
+      { type: "Paragraph", props: { content: body }, style: { marginBottom: 0 } },
     ],
   });
   return {
     schemaVersion: SDUI_SCHEMA_VERSION,
     screenId: "onboarding",
     title: "Welcome",
-    template: "feature",
+    template: "scroll",
     state: {},
     actions: { start: { kind: "switchTab", tabId: "home" } },
     blocks: [
-      {
-        type: "Hero",
-        props: {
-          title: "@onboarding.title",
-          subtitle: "@onboarding.subtitle",
-        },
-      },
-      { type: "Badge", props: { label: "VOICE • REFINE • REPLY", tone: "accent" } },
-      { type: "Spacer", style: { height: 12 } },
+      { type: "Spacer", style: { height: 28 } },
+      { type: "Overline", props: { content: "Voice · Refine · Reply" }, style: { textAlign: "center" } },
+      { type: "Heading", props: { content: "@onboarding.title" }, style: { textAlign: "center", fontSize: 30, lineHeight: 38, marginBottom: 12 } },
+      { type: "Paragraph", props: { content: "@onboarding.subtitle" }, style: { textAlign: "center", marginBottom: 36 } },
       {
         type: "Stack",
-        style: { direction: "column", gap: 10 },
+        style: { direction: "column", gap: 22 },
         children: [
-          step("🎙️", "Talk, don't type", "Tap the mic on the Tulmi keyboard and just speak."),
-          step("✨", "One-tap polish", "Refine turns messy text into clean, clear writing."),
-          step("💬", "Replies in your voice", "Paste a message, say your intent, get a perfect reply."),
-          step("🎚️", "Always you", "Set your tone once — every word matches your style."),
+          step("🎙️  Talk, don't type", "Tap the mic on the Tulmi keyboard and just speak."),
+          step("✨  One-tap polish", "Refine turns messy text into clean, clear writing."),
+          step("💬  Replies in your voice", "Paste a message, say your intent, get a perfect reply."),
+          step("🎚️  Always you", "Set your tone once — every word matches your style."),
         ],
       },
-      { type: "Spacer", style: { height: 20 } },
+      { type: "Spacer", style: { height: 40 } },
       { type: "Button", props: { label: "@onboarding.cta", variant: "primary" }, on: { onPress: "start" } },
     ],
     cacheTtlSeconds: 300,

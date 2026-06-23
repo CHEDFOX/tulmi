@@ -5,8 +5,8 @@
 export const CORE_COMPONENTS = [
   "Screen", "Stack", "Spacer", "Text", "Image", "Icon", "Button",
   "TextField", "Chip", "Card", "List", "Divider", "ProgressBar", "VoiceButton",
-  // SDUI v2 content blocks:
-  "Heading", "Paragraph", "Badge", "KeyValue", "Hero",
+  // SDUI v2 content blocks (editorial / Plutto-style):
+  "Overline", "Heading", "Paragraph", "Quote", "Badge", "KeyValue", "Hero",
 ] as const;
 
 export const CORE_ACTIONS = [
