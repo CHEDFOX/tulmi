@@ -16,12 +16,23 @@ export type NavigationShell =
   | { kind: "tabs"; tabs: Array<{ id: string; title: string; icon?: string; screenId: string }> }
   | { kind: "stack"; rootScreenId: string };
 
+export interface UpdateGate {
+  minVersion?: string;
+  latestVersion?: string;
+  title?: string;
+  message?: string;
+  cta?: string;
+  url?: { ios?: string; android?: string; default?: string };
+}
+
 export interface BootstrapResponse {
   schemaVersion: number;
   theme: ThemeTokens;
   navigation: NavigationShell;
   initialScreenId: string;
   flags?: Record<string, boolean | number | string>;
+  labels?: Record<string, string>;
+  update?: UpdateGate;
   cacheTtlSeconds?: number;
 }
 
@@ -56,7 +67,9 @@ export interface ScreenResponse {
   screenId: string;
   title?: string;
   theme?: Partial<ThemeTokens>;
-  root: Node;
+  template?: string;
+  blocks?: Node[];
+  root?: Node;
   state?: Record<string, any>;
   actions?: Record<string, ActionSpec>;
   cacheTtlSeconds?: number;

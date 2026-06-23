@@ -71,6 +71,29 @@ export function buildBootstrap(): BootstrapResponse {
     navigation: NAV,
     initialScreenId: "home",
     flags: {},
+    // Central copy — every screen can reference these with "@key".
+    labels: {
+      "app.name": "Tulmi",
+      "onboarding.title": "Welcome to Tulmi",
+      "onboarding.subtitle": "Speak or type rough — Tulmi makes it sound like you.",
+      "onboarding.cta": "Get started",
+      "home.refine": "✨ Refine",
+      "common.save": "Save",
+    },
+    // Version gate (dormant: thresholds are at/below the shipped app version, so
+    // it won't fire — flip these to force/suggest an update from the server).
+    update: {
+      minVersion: "0.5.0",
+      latestVersion: "1.0.0",
+      title: "Update Tulmi",
+      message: "A newer version of Tulmi is available with the latest improvements.",
+      cta: "Update now",
+      url: {
+        android: "https://play.google.com/store/apps/details?id=com.tulmi.app",
+        ios: "https://apps.apple.com/app/id000000000",
+        default: "https://github.com/CHEDFOX/tulmi",
+      },
+    },
     cacheTtlSeconds: 300,
   };
 }
@@ -394,44 +417,50 @@ function settingsScreen(): ScreenResponse {
   };
 }
 
-/** Onboarding / welcome — a navigable screen demonstrating navigation. */
+/**
+ * Onboarding — built with the "feature" TEMPLATE + content BLOCKS (not a raw
+ * tree). Demonstrates SDUI v2: named templates, @label refs, and the new blocks
+ * (Hero, Badge, KeyValue, Paragraph). The app composes the layout from `blocks`.
+ */
 function onboardingScreen(): ScreenResponse {
   const step = (emoji: string, title: string, body: string): Node => ({
     type: "Card",
-    style: { margin: 0 },
     motion: { appear: "fadeInUp" },
     children: [
-      text(`${emoji}  ${title}`, "body"),
-      spacer(4),
-      text(body, "caption"),
+      { type: "Heading", props: { content: `${emoji}  ${title}` }, style: { fontSize: 16 } },
+      { type: "Paragraph", props: { content: body } },
     ],
   });
   return {
     schemaVersion: SDUI_SCHEMA_VERSION,
     screenId: "onboarding",
     title: "Welcome",
+    template: "feature",
     state: {},
     actions: { start: { kind: "switchTab", tabId: "home" } },
-    root: {
-      type: "Screen",
-      children: [
-        text("Welcome to Tulmi", "h1"),
-        text("Speak or type rough — Tulmi makes it sound like you.", "muted"),
-        spacer(16),
-        {
-          type: "Stack",
-          style: { direction: "column", gap: 10 },
-          children: [
-            step("🎙️", "Talk, don't type", "Tap the mic on the Tulmi keyboard and just speak."),
-            step("✨", "One-tap polish", "Refine turns messy text into clean, clear writing."),
-            step("💬", "Replies in your voice", "Paste a message, say your intent, get a perfect reply."),
-            step("🎚️", "Always you", "Set your tone once — every word matches your style."),
-          ],
+    blocks: [
+      {
+        type: "Hero",
+        props: {
+          title: "@onboarding.title",
+          subtitle: "@onboarding.subtitle",
         },
-        spacer(20),
-        { type: "Button", props: { label: "Get started", variant: "primary" }, on: { onPress: "start" } },
-      ],
-    },
+      },
+      { type: "Badge", props: { label: "VOICE • REFINE • REPLY", tone: "accent" } },
+      { type: "Spacer", style: { height: 12 } },
+      {
+        type: "Stack",
+        style: { direction: "column", gap: 10 },
+        children: [
+          step("🎙️", "Talk, don't type", "Tap the mic on the Tulmi keyboard and just speak."),
+          step("✨", "One-tap polish", "Refine turns messy text into clean, clear writing."),
+          step("💬", "Replies in your voice", "Paste a message, say your intent, get a perfect reply."),
+          step("🎚️", "Always you", "Set your tone once — every word matches your style."),
+        ],
+      },
+      { type: "Spacer", style: { height: 20 } },
+      { type: "Button", props: { label: "@onboarding.cta", variant: "primary" }, on: { onPress: "start" } },
+    ],
     cacheTtlSeconds: 300,
   };
 }

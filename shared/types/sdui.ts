@@ -72,8 +72,32 @@ export interface BootstrapResponse {
   initialScreenId: string;
   /** Optional remote feature flags the renderer can read in conditions. */
   flags?: Record<string, boolean | number | string>;
+  /**
+   * Central copy: every user-facing string the app can show. Nodes reference
+   * a label with "@key" (e.g. props.content = "@home.title"), so ALL wording is
+   * controlled from the backend and reusable across screens.
+   */
+  labels?: Record<string, string>;
+  /** Version gating — force or suggest an app update from the server. */
+  update?: UpdateGate;
   /** Seconds the client may cache bootstrap before refetching. */
   cacheTtlSeconds?: number;
+}
+
+/**
+ * Lets the backend block or nudge old app versions without an app-store action.
+ * The client sends its appVersion in capabilities; the server returns thresholds.
+ */
+export interface UpdateGate {
+  /** Apps below this are hard-blocked with a non-dismissible screen. */
+  minVersion?: string;
+  /** Apps below this (but >= minVersion) see a dismissible prompt. */
+  latestVersion?: string;
+  title?: string;
+  message?: string;
+  cta?: string;
+  /** Where the CTA sends the user (store links). */
+  url?: { ios?: string; android?: string; default?: string };
 }
 
 /** The persistent navigation chrome. Either a tab bar or a plain stack. */
@@ -112,8 +136,18 @@ export interface ScreenResponse {
   title?: string;
   /** Per-screen theme overrides merged over the global theme. */
   theme?: Partial<ThemeTokens>;
-  /** The component tree. */
-  root: Node;
+  /**
+   * Two ways to describe a screen:
+   *  1. `root` — a full, hand-built Node tree (max flexibility).
+   *  2. `template` + `blocks` — name a layout the app already knows ("feature",
+   *     "list", "scroll"…) and hand it content blocks; the app composes the
+   *     chrome. Same idea as Plutto's templates. Provide one or the other.
+   */
+  template?: string;
+  /** Content blocks for the named template (when `template` is set). */
+  blocks?: Node[];
+  /** The component tree (when not using a template). */
+  root?: Node;
   /**
    * Initial client-side state for this screen. Nodes bind to it via `bind`,
    * and actions mutate it via `setState`. Keys are dot-paths.
@@ -190,9 +224,17 @@ export const CORE_COMPONENTS = [
   "List", // props.items (data path) + props.itemTemplate (Node)
   "Divider",
   "ProgressBar",
-  "Lottie", // props.source — server-driven motion/media
-  "WebView", // escape hatch for rich/remote content
+  "VoiceButton", // records mic → /v1/transcribe-clean → bind.value
+  // SDUI v2 content blocks:
+  "Heading", // props.content
+  "Paragraph", // props.content
+  "Badge", // props.label, props.tone ("accent")
+  "KeyValue", // props.label, props.value
+  "Hero", // props.title, props.subtitle, props.image
 ] as const;
+
+/** Named layouts for `template` + `blocks` screens. */
+export const CORE_TEMPLATES = ["scroll", "feature", "list", "centered"] as const;
 
 // ===========================================================================
 // 4. Actions — declarative behavior

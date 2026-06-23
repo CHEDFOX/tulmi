@@ -6,18 +6,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { bootstrap, fetchScreen } from "./client";
+import { bootstrap, fetchScreen, APP_VERSION } from "./client";
 import { RenderNode } from "./Renderer";
 import { ThemeContext } from "./components";
 import { Store } from "./state";
+import { composeTemplate } from "./templates";
 import type { Ctx, NavApi } from "./actions";
-import type { BootstrapResponse, ScreenResponse, ThemeTokens } from "./types";
+import type { BootstrapResponse, ScreenResponse, ThemeTokens, UpdateGate } from "./types";
 import { DEFAULT_BASE_URL, getBaseUrl, setBaseUrl, getOnboarded, setOnboarded } from "../storage";
 import * as api from "../api";
 
@@ -34,6 +37,7 @@ export default function SduiApp() {
   const [reload, setReload] = useState(0);
   const [toast, setToast] = useState<Toast | null>(null);
   const [showConnection, setShowConnection] = useState(false);
+  const [updateDismissed, setUpdateDismissed] = useState(false);
 
   const showToast = useCallback((message: string, tone?: string) => {
     setToast({ message, tone });
@@ -127,6 +131,12 @@ export default function SduiApp() {
   const canGoBack = stack.length > 1;
   const tabs = boot?.navigation.kind === "tabs" ? boot.navigation.tabs : [];
 
+  // Version gate: backend can force or suggest an app update.
+  const update = boot?.update;
+  const below = (v?: string) => !!v && cmpVersion(APP_VERSION, v) < 0;
+  const updateForced = !!update && below(update.minVersion);
+  const updateOptional = !updateForced && !!update && below(update.latestVersion) && !updateDismissed;
+
   return (
     <View style={[styles.app, { backgroundColor: theme.color.bg }]}>
       <View style={styles.header}>
@@ -146,7 +156,7 @@ export default function SduiApp() {
       <View style={{ flex: 1 }}>
         {screen ? (
           <ThemeContext.Provider value={theme}>
-            <ScreenHost screen={screen} nav={nav} flags={boot?.flags ?? {}} toast={showToast} />
+            <ScreenHost screen={screen} nav={nav} flags={boot?.flags ?? {}} labels={boot?.labels ?? {}} toast={showToast} />
           </ThemeContext.Provider>
         ) : (
           <View style={styles.center}><ActivityIndicator color={theme.color.primary} /></View>
@@ -179,6 +189,62 @@ export default function SduiApp() {
           <Text style={{ color: "#fff" }}>{toast.message}</Text>
         </View>
       )}
+
+      {(updateForced || updateOptional) && update && (
+        <UpdateGateOverlay
+          info={update}
+          forced={updateForced}
+          theme={theme}
+          onDismiss={() => setUpdateDismissed(true)}
+        />
+      )}
+    </View>
+  );
+}
+
+/** Compare dotted versions: returns <0, 0, >0. */
+function cmpVersion(a: string, b: string): number {
+  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/** Backend-driven update screen: a hard blocker (forced) or a dismissible nudge. */
+function UpdateGateOverlay({
+  info,
+  forced,
+  theme,
+  onDismiss,
+}: {
+  info: UpdateGate;
+  forced: boolean;
+  theme: ThemeTokens;
+  onDismiss: () => void;
+}) {
+  const storeUrl = info.url?.[Platform.OS === "ios" ? "ios" : "android"] ?? info.url?.default;
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(8,8,12,0.96)", alignItems: "center", justifyContent: "center", padding: 28 }]}>
+      <Text style={{ color: theme.color.text, fontSize: 22, fontWeight: "800", textAlign: "center", marginBottom: 10 }}>
+        {info.title ?? "Update Tulmi"}
+      </Text>
+      <Text style={{ color: theme.color.muted, fontSize: 15, textAlign: "center", lineHeight: 22, marginBottom: 22 }}>
+        {info.message ?? "A new version is available."}
+      </Text>
+      <Pressable
+        onPress={() => storeUrl && Linking.openURL(storeUrl)}
+        style={{ backgroundColor: theme.color.primary, borderRadius: theme.radius.md, paddingVertical: 14, paddingHorizontal: 28, minWidth: 200, alignItems: "center" }}
+      >
+        <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{info.cta ?? "Update now"}</Text>
+      </Pressable>
+      {!forced && (
+        <Pressable onPress={onDismiss} style={{ marginTop: 14 }}>
+          <Text style={{ color: theme.color.muted }}>Not now</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -188,16 +254,20 @@ function ScreenHost({
   screen,
   nav,
   flags,
+  labels,
   toast,
 }: {
   screen: ScreenResponse;
   nav: NavApi;
   flags: Record<string, any>;
+  labels: Record<string, string>;
   toast: (m: string, tone?: string) => void;
 }) {
   const store = useMemo(() => new Store(screen.state ?? {}), [screen]);
-  const ctx: Ctx = { store, actions: screen.actions ?? {}, flags, nav, toast };
-  return <RenderNode node={screen.root} ctx={ctx} />;
+  const ctx: Ctx = { store, actions: screen.actions ?? {}, flags, labels, nav, toast };
+  // A screen is either a full `root` tree, or a named `template` + `blocks`.
+  const root = screen.root ?? composeTemplate(screen);
+  return <RenderNode node={root} ctx={ctx} />;
 }
 
 // --- Connection (client-local; needed to reach the server) ------------------

@@ -5,9 +5,9 @@
 import { Platform } from "react-native";
 import { getBaseUrl } from "../storage";
 import type { BootstrapResponse, ScreenResponse } from "./types";
-import { CORE_COMPONENTS, CORE_ACTIONS } from "./registry";
+import { CORE_COMPONENTS, CORE_ACTIONS, CORE_TEMPLATES } from "./registry";
 
-const APP_VERSION = "1.0.0";
+export const APP_VERSION = "1.0.0";
 const SDUI_SCHEMA_VERSION = 1;
 
 async function token(): Promise<string> {
@@ -21,6 +21,7 @@ export function buildCapabilities() {
     platform: Platform.OS === "ios" ? "ios" : "android",
     components: CORE_COMPONENTS,
     actions: CORE_ACTIONS,
+    templates: CORE_TEMPLATES,
   };
 }
 

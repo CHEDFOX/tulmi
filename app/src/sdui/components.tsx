@@ -217,6 +217,53 @@ const ProgressBar = ({ style }: CompProps) => {
 // List is rendered specially by the renderer (needs per-item scope); placeholder here.
 const ListPlaceholder = ({ children }: CompProps) => <View>{children}</View>;
 
+// --- SDUI v2 content blocks -------------------------------------------------
+
+const Heading = ({ props, style }: CompProps) => {
+  const theme = useTheme();
+  return <Text style={[{ color: theme.color.text, fontSize: theme.font.sizes.h1, fontWeight: "800", marginBottom: 4 }, style]}>{props.content ?? ""}</Text>;
+};
+
+const Paragraph = ({ props, style }: CompProps) => {
+  const theme = useTheme();
+  return <Text style={[{ color: theme.color.muted, fontSize: theme.font.sizes.body, lineHeight: 22, marginBottom: 8 }, style]}>{props.content ?? ""}</Text>;
+};
+
+const Badge = ({ props, style }: CompProps) => {
+  const theme = useTheme();
+  const tone = props.tone === "accent" ? theme.color.primary : theme.color.muted;
+  return (
+    <View style={[{ alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, borderRadius: theme.radius.pill, borderWidth: 1, borderColor: tone }, style]}>
+      <Text style={{ color: tone, fontSize: theme.font.sizes.caption, fontWeight: "700" }}>{props.label ?? ""}</Text>
+    </View>
+  );
+};
+
+const KeyValue = ({ props, style }: CompProps) => {
+  const theme = useTheme();
+  return (
+    <View style={[{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: theme.color.border }, style]}>
+      <Text style={{ color: theme.color.muted, fontSize: theme.font.sizes.body }}>{props.label ?? ""}</Text>
+      <Text style={{ color: theme.color.text, fontSize: theme.font.sizes.body, fontWeight: "600" }}>{props.value ?? ""}</Text>
+    </View>
+  );
+};
+
+const Hero = ({ props, style }: CompProps) => {
+  const theme = useTheme();
+  return (
+    <View style={[{ borderRadius: theme.radius.md, overflow: "hidden", backgroundColor: theme.color.card, borderWidth: 1, borderColor: theme.color.border, marginBottom: 12 }, style]}>
+      {props.image ? (
+        <Image source={{ uri: props.image }} style={{ width: "100%", height: 140 }} />
+      ) : null}
+      <View style={{ padding: 16 }}>
+        {props.title ? <Text style={{ color: theme.color.text, fontSize: theme.font.sizes.h1, fontWeight: "800" }}>{props.title}</Text> : null}
+        {props.subtitle ? <Text style={{ color: theme.color.muted, fontSize: theme.font.sizes.body, marginTop: 4 }}>{props.subtitle}</Text> : null}
+      </View>
+    </View>
+  );
+};
+
 /**
  * VoiceButton — records the mic (expo-audio), uploads to /v1/transcribe-clean,
  * and writes the cleaned text to bind.value. A server-declared native capability
@@ -289,4 +336,5 @@ const VoiceButton = ({ node, props, style, store, fire }: CompProps) => {
 export const REGISTRY: Record<string, React.ComponentType<CompProps>> = {
   Screen, Stack, Spacer, Text: TextC, Image: ImageC, Icon, Button,
   TextField, Chip, Card, Divider, ProgressBar, List: ListPlaceholder, VoiceButton,
+  Heading, Paragraph, Badge, KeyValue, Hero,
 };

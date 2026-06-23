@@ -18,6 +18,8 @@ export interface Ctx {
   store: Store;
   actions: Record<string, ActionSpec>;
   flags: Record<string, any>;
+  /** Central copy from the catalog; "@key" props resolve through this. */
+  labels: Record<string, string>;
   nav: NavApi;
   toast: (message: string, tone?: string) => void;
   event?: any;

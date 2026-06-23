@@ -5,6 +5,8 @@
 export const CORE_COMPONENTS = [
   "Screen", "Stack", "Spacer", "Text", "Image", "Icon", "Button",
   "TextField", "Chip", "Card", "List", "Divider", "ProgressBar", "VoiceButton",
+  // SDUI v2 content blocks:
+  "Heading", "Paragraph", "Badge", "KeyValue", "Hero",
 ] as const;
 
 export const CORE_ACTIONS = [
@@ -12,3 +14,6 @@ export const CORE_ACTIONS = [
   "callEndpoint", "refresh", "setState", "toggleState", "haptic",
   "toast", "playMedia", "speak", "sequence", "condition",
 ] as const;
+
+/** Named layouts the app can compose from `template` + `blocks`. */
+export const CORE_TEMPLATES = ["scroll", "feature", "list", "centered"] as const;

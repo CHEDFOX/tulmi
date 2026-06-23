@@ -23,6 +23,11 @@ export function RenderNode({ node, ctx }: { node: Node; ctx: Ctx }) {
   // Resolve props: literal props + bound props (bind: { prop -> statePath }).
   const props: Record<string, any> = { ...(node.props ?? {}) };
   if (node.bind) for (const k of Object.keys(node.bind)) props[k] = ctx.store.get(node.bind[k]);
+  // Resolve "@label.key" string props against the catalog's central copy.
+  for (const k of Object.keys(props)) {
+    const v = props[k];
+    if (typeof v === "string" && v.startsWith("@")) props[k] = ctx.labels[v.slice(1)] ?? v.slice(1);
+  }
 
   const style = resolveStyle(node.style, theme);
   const fire = (event: NodeEvent, value?: any) => {
