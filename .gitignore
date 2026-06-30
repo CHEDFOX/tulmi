@@ -3,6 +3,10 @@
 .env.local
 *.env
 !.env.example
+secrets/
+*.p8
+*.p12
+play-service-account.json
 
 # Node
 node_modules/

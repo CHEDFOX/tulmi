@@ -18,10 +18,26 @@ const path = require("path");
 const SERVICE = "com.tulmi.app.keyboard.TulmiKeyboardService";
 const JAVA_PKG_PATH = path.join("com", "tulmi", "app", "keyboard");
 
+// Cleartext HTTP is only useful when pointing the keyboard at a dev PC
+// (Android emulator → 10.0.2.2:8770, or a LAN IP). Production talks to the
+// VPS over HTTPS, so we MUST NOT ship usesCleartextTraffic=true. The EAS
+// build profile is exposed as EAS_BUILD_PROFILE during managed builds; locally
+// it falls back to "development" so `expo run:android` keeps working.
+function isDevProfile() {
+  const profile =
+    process.env.EAS_BUILD_PROFILE || process.env.APP_ENV || "development";
+  return profile !== "production";
+}
+
 function withManifest(config) {
   return withAndroidManifest(config, (cfg) => {
     const app = cfg.modResults.manifest.application[0];
-    app["$"]["android:usesCleartextTraffic"] = "true";
+    if (isDevProfile()) {
+      app["$"]["android:usesCleartextTraffic"] = "true";
+    } else {
+      // Make sure a previous prebuild's true value never lingers.
+      delete app["$"]["android:usesCleartextTraffic"];
+    }
     app.service = app.service || [];
     const already = app.service.some(
       (s) => s["$"] && s["$"]["android:name"] === SERVICE,

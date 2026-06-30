@@ -3,13 +3,17 @@
  * build can point at your PC during testing or your VPS in production.
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BACKEND_BASE_URL } from "./config";
 
 const KEY_BASE_URL = "tulmi.baseUrl";
 
 // Default = the live production backend, so a fresh (TestFlight) install reaches
 // it with no setup. Override in the app's ⚙ Connection screen to point at a PC
 // (Android emulator → 10.0.2.2:8770) or LAN IP during local development.
-export const DEFAULT_BASE_URL = "https://api.tailzu.space";
+//
+// The constant is re-exported from src/config so the JS bundle, Kotlin keyboard
+// (Net.kt), and Swift keyboard extension (TulmiBackend.swift) share one URL.
+export const DEFAULT_BASE_URL = BACKEND_BASE_URL;
 
 export async function getBaseUrl(): Promise<string> {
   const v = await AsyncStorage.getItem(KEY_BASE_URL);

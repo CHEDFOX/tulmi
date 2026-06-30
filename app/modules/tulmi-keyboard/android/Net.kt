@@ -14,16 +14,26 @@ import java.util.concurrent.TimeUnit
  * Tiny backend client for the keyboard. Uses OkHttp (already on the classpath
  * via React Native), so no extra Gradle dependency is needed.
  *
- * NOTE: until we bridge the app's saved backend URL into the keyboard, set
- * baseUrl here. Android emulator → your PC = 10.0.2.2; a physical phone → your
- * PC's LAN IP, or your VPS URL.
+ * BACKEND URL SOURCE OF TRUTH: app/src/config.ts (BACKEND_BASE_URL). The
+ * default `baseUrl` below must mirror that constant — `npm run check:base-url`
+ * (also run in CI) fails the build if they drift. At runtime, the main app
+ * overwrites both fields via SharedPreferences("tulmi") through the
+ * tulmi-bridge native module, so the URL the user picks in the in-app
+ * Connection screen propagates here automatically.
  */
 object Net {
     var baseUrl: String = "https://api.tailzu.space"
     private var token = "dev" // shared by the app via SharedPreferences (see load)
 
+    // Separate timeouts beat one big call-timeout: a slow TLS handshake or
+    // sluggish read should fail fast (and surface a clear error in the IME)
+    // instead of hanging the keyboard for a full minute.
     private val client = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
         .callTimeout(60, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
 
     /**

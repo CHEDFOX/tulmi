@@ -26,12 +26,14 @@
     <key>NSExtensionPrincipalClass</key>
     <string>$(PRODUCT_MODULE_NAME).KeyboardViewController</string>
   </dict>
-  <!-- Dev only: allow plain-HTTP backend during testing (mirrors Android
-       usesCleartextTraffic). Tighten this before shipping. -->
-  <key>NSAppTransportSecurity</key>
-  <dict>
-    <key>NSAllowsArbitraryLoads</key>
-    <true/>
-  </dict>
+  <!--
+    App Transport Security: defaults are strict (HTTPS only with TLS ≥ 1.2),
+    which matches the production backend at https://api.tailzu.space. We do
+    NOT set NSAllowsArbitraryLoads here — that would ship cleartext-everywhere
+    permission to App Store users and is a review red flag.
+
+    For local development against a plain-HTTP PC backend, add an exception
+    domain (e.g. "localhost") to YOUR working copy and do not commit it.
+  -->
 </dict>
 </plist>

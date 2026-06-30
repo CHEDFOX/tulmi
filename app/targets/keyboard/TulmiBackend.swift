@@ -4,7 +4,12 @@ import Foundation
 ///
 /// The backend URL + user token are shared by the main app through an App Group
 /// (written by the tulmi-bridge native module). We read them here, falling back
-/// to localhost + a "dev" token (DEV_SKIP_AUTH) when the app hasn't written yet.
+/// to the production backend + a "dev" token (DEV_SKIP_AUTH) when the app
+/// hasn't written yet.
+///
+/// BACKEND URL SOURCE OF TRUTH: app/src/config.ts (BACKEND_BASE_URL). The
+/// fallback string literal below must mirror that constant —
+/// `npm run check:base-url` (also run in CI) fails the build if they drift.
 enum TulmiBackend {
   // Must match the App Group in the app + keyboard entitlements.
   private static let appGroup = "group.com.tulmi.app"
