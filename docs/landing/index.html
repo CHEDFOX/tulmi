@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <title>Tailzu — a keyboard that sounds like you</title>
+    <meta
+      name="description"
+      content="Tailzu is a voice + typing keyboard that turns messy dictation into polished, on-brand text — in your own voice, in any language, in every app."
+    />
+    <!-- OpenGraph / Twitter cards -->
+    <meta property="og:title" content="Tailzu — a keyboard that sounds like you" />
+    <meta property="og:description" content="Speak in messy Hinglish, get a polished reply. Refine any typed message into your voice. Runs everywhere you type." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://tailzu.space" />
+    <meta property="og:image" content="https://tailzu.space/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <style>
+      /* Minimal, black/white, works without JS. Replace with a real design pass
+         once we have final brand assets. */
+      :root {
+        --bg: #000;
+        --fg: #fff;
+        --muted: rgba(255, 255, 255, 0.55);
+        --accent: #e8a23c;
+        --border: rgba(255, 255, 255, 0.14);
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--bg);
+        color: var(--fg);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, system-ui, sans-serif;
+        font-weight: 300;
+        line-height: 1.55;
+        padding: 48px 24px 96px;
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      header { margin-bottom: 96px; }
+      .brand { font-size: 22px; letter-spacing: 0.4px; }
+      .hero { margin-top: 32px; }
+      .hero h1 {
+        font-size: clamp(38px, 6.5vw, 64px);
+        font-weight: 200;
+        letter-spacing: -0.4px;
+        line-height: 1.1;
+        margin: 0 0 20px;
+      }
+      .hero p { font-size: 18px; color: var(--muted); margin: 0 0 32px; max-width: 540px; }
+      .cta {
+        display: inline-flex; gap: 12px; align-items: center;
+        padding: 12px 22px; border-radius: 24px;
+        background: var(--fg); color: var(--bg);
+        text-decoration: none; font-weight: 500; font-size: 15px;
+      }
+      .cta.ghost { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+      .cta + .cta { margin-left: 12px; }
+
+      section { margin: 72px 0; }
+      section h2 {
+        font-size: 26px; font-weight: 300; letter-spacing: -0.2px;
+        margin: 0 0 24px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+      }
+      .grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;
+      }
+      .card {
+        border: 1px solid var(--border); border-radius: 14px; padding: 20px;
+      }
+      .card h3 { margin: 0 0 8px; font-size: 16px; font-weight: 500; }
+      .card p { margin: 0; color: var(--muted); font-size: 14px; }
+      .demo {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+        border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-top: 12px;
+      }
+      .demo > div h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); }
+      .demo pre { margin: 0; font-family: "SF Mono", ui-monospace, monospace; font-size: 14px; white-space: pre-wrap; }
+      .privacy {
+        border: 1px solid var(--border); border-radius: 14px; padding: 20px;
+        display: flex; gap: 24px; flex-wrap: wrap;
+      }
+      .privacy > div { flex: 1; min-width: 220px; }
+      .privacy strong { color: var(--accent); font-weight: 400; }
+      footer {
+        margin-top: 96px; padding-top: 32px; border-top: 1px solid var(--border);
+        color: var(--muted); font-size: 13px; display: flex; gap: 24px; flex-wrap: wrap;
+      }
+      footer a { color: var(--muted); text-decoration: none; border-bottom: 1px solid transparent; }
+      footer a:hover { border-bottom-color: var(--muted); }
+      @media (max-width: 640px) {
+        .demo { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">Tailzu</div>
+      <div class="hero">
+        <h1>The keyboard that sounds like you.</h1>
+        <p>
+          Speak in messy Hinglish, get a polished reply. Refine any typed
+          message into your voice. Runs everywhere you type — WhatsApp,
+          Gmail, Slack, anywhere.
+        </p>
+        <a class="cta" href="#waitlist">Join the waitlist</a>
+        <a class="cta ghost" href="/privacy">Read the privacy policy</a>
+      </div>
+    </header>
+
+    <section>
+      <h2>Why it's different</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Speaks your voice</h3>
+          <p>Set a tone, learn from a sample, dial formality / length / warmth per app.
+          It writes like you — not like a chatbot.</p>
+        </div>
+        <div class="card">
+          <h3>Hinglish first</h3>
+          <p>Code-switching stays intact. "Kal meeting hai at 5" doesn't get
+          translated into anything.</p>
+        </div>
+        <div class="card">
+          <h3>Instant voice, anywhere</h3>
+          <p>One tap in the app primes the mic. From then on the keyboard
+          dictates instantly in every host app — no switching back.</p>
+        </div>
+        <div class="card">
+          <h3>Never talks over you</h3>
+          <p>Cleanup preserves your meaning. Undo restores the original in
+          a tap. Your text is yours.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Try it in your head</h2>
+      <div class="demo">
+        <div>
+          <h4>You said</h4>
+          <pre>um yaar so basically the launch got pushed to next monday because the api integration broke and now the whole demo needs a rework</pre>
+        </div>
+        <div>
+          <h4>Tailzu wrote</h4>
+          <pre>Heads up — launch is pushed to next Monday. The API integration broke, so the demo needs a rework.</pre>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Your data</h2>
+      <div class="privacy">
+        <div>
+          <strong>We don't sell it.</strong> Ever. That's not a marketing
+          line, it's the point of the product.
+        </div>
+        <div>
+          <strong>Audio is deleted.</strong> Sent to a speech-to-text
+          provider, transcribed, gone. We keep the text you see, not the
+          sound you spoke.
+        </div>
+        <div>
+          <strong>Receipts in-app.</strong> Every request is counted and
+          shown. See it: Settings → Data &amp; Privacy.
+        </div>
+      </div>
+    </section>
+
+    <section id="waitlist">
+      <h2>Join the beta</h2>
+      <p style="color: var(--muted); margin-top: -12px;">
+        We're rolling out TestFlight + Play Internal slots each week. Drop
+        your email at
+        <a href="mailto:beta@tailzu.space" style="color: var(--fg);">beta@tailzu.space</a>
+        and we'll send an invite.
+      </p>
+    </section>
+
+    <footer>
+      <span>© Tailzu</span>
+      <a href="/privacy">Privacy</a>
+      <a href="mailto:support@tailzu.space">Support</a>
+      <a href="mailto:security@tailzu.space">Security disclosures</a>
+    </footer>
+  </body>
+</html>

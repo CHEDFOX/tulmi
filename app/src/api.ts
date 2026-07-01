@@ -154,3 +154,27 @@ export async function putPersonality(personality: Personality): Promise<Personal
   const json = await jsonPost<{ personality: Personality }>("/v1/personality", personality);
   return json.personality ?? {};
 }
+
+// --- Privacy: receipts for the "Data & Privacy" screen ---------------------
+
+export interface PrivacyAuditWindow {
+  window: string;
+  requests: number;
+  audioSeconds: number;
+  words: number;
+}
+
+export interface PrivacyAudit {
+  windows: PrivacyAuditWindow[];
+  audioRetained: boolean;
+  learningFromRuns: boolean;
+  upstreamProviders: string[];
+  links: Array<{ label: string; url: string }>;
+}
+
+export async function privacyAudit(): Promise<PrivacyAudit> {
+  const base = await getBaseUrl();
+  const res = await fetch(`${base}/v1/privacy/audit`, { headers: await authHeaders() });
+  if (!res.ok) throw new Error(`privacy audit failed: ${res.status}`);
+  return (await res.json()) as PrivacyAudit;
+}

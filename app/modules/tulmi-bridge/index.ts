@@ -9,10 +9,20 @@ export interface KeyboardStatus {
   lastActiveMs: number;
 }
 
+export interface AudioKeepAliveState {
+  /** iOS: silent background AVAudioSession is running. Android: always true. */
+  ready: boolean;
+  /** epoch-ms when the session was (last) primed; 0 if never. */
+  readyAtMs: number;
+}
+
 interface TulmiBridgeNative {
   setKeyboardCredentials(baseUrl: string, token: string): void;
   getKeyboardStatus?(): KeyboardStatus | undefined;
   setDictionary?(json: string): void;
+  startAudioKeepAlive?(): { ok: boolean; readyAtMs: number };
+  stopAudioKeepAlive?(): boolean;
+  getAudioKeepAliveState?(): AudioKeepAliveState;
 }
 
 // The native module exists only in dev/prod builds (not in Expo Go). Resolve it
@@ -75,4 +85,44 @@ export function setKeyboardDictionary(entries: { word: string; replacement: stri
 /** True when the native bridge is available (a dev/prod build, not Expo Go). */
 export function isBridgeAvailable(): boolean {
   return native != null;
+}
+
+/**
+ * Prime the "instant voice" background audio session so the keyboard can
+ * record on demand in any host app. On iOS this holds a silent
+ * `.playAndRecord` AVAudioSession alive under the app's `Background Modes:
+ * audio` capability; on Android this is a no-op (Android IMEs record freely
+ * with RECORD_AUDIO). Returns { ok: true } when the session is active.
+ */
+export function startAudioKeepAlive(): { ok: boolean; readyAtMs: number } {
+  try {
+    const r = native?.startAudioKeepAlive?.();
+    return r ?? { ok: false, readyAtMs: 0 };
+  } catch {
+    return { ok: false, readyAtMs: 0 };
+  }
+}
+
+/** Turn off the keep-alive (a Settings toggle can call this). */
+export function stopAudioKeepAlive(): void {
+  try {
+    native?.stopAudioKeepAlive?.();
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Whether the keep-alive is currently active. Read from the shared App Group
+ * flag so the answer matches what the keyboard sees. Returns
+ * { ready: false, readyAtMs: 0 } when the bridge isn't available.
+ */
+export function getAudioKeepAliveState(): AudioKeepAliveState {
+  try {
+    const s = native?.getAudioKeepAliveState?.();
+    if (!s) return { ready: false, readyAtMs: 0 };
+    return { ready: !!s.ready, readyAtMs: Number(s.readyAtMs) || 0 };
+  } catch {
+    return { ready: false, readyAtMs: 0 };
+  }
 }

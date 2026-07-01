@@ -68,6 +68,12 @@ class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
   private var pendingPartial = "" // partial text currently shown in the field
   private var dictatedSomething = false // a final landed this session → auto-refine on close
 
+  /// The last successful refine. Powers "undo last refine": on undo tap, if the
+  /// field still ends with our `after` string we swap it back to `before` — one
+  /// tap to try again with a different tone. Cleared once used or on any manual
+  /// edit that shifts the text away from `after`.
+  private var lastRefineSnapshot: (before: String, after: String, appendedAfter: String)?
+
   // QWERTY letter rows.
   private let rows: [[String]] = [
     ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
@@ -95,12 +101,14 @@ class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
     loadDictionary()
     buildKeyboard()
     loadAndApplyConfig()
+    updateInstantVoiceChip()
   }
 
   override func viewWillAppear(_ animated: Bool) {
     super.viewWillAppear(animated)
     writeKeyboardStatus()
     loadDictionary() // pick up edits made in the app
+    updateInstantVoiceChip()
   }
 
   /// Publish the keyboard's live state to the shared App Group so the main app
@@ -418,7 +426,37 @@ class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
   @objc private func menuTapped() { /* options menu — wired later */ }
 
   @objc private func undoTapped() {
-    // Undo the last word.
+    // 1. Restore the last refine when the field still contains its result.
+    //    This is the "one-tap try again" moment — much more useful than a
+    //    word-delete because refine can change tone/length wholesale.
+    if let snap = lastRefineSnapshot {
+      let currentBefore = textDocumentProxy.documentContextBeforeInput ?? ""
+      let currentAfter = textDocumentProxy.documentContextAfterInput ?? ""
+      let currentAll = currentBefore + currentAfter
+      let snapAll = snap.after + snap.appendedAfter
+      // Match on suffix: the user may have already typed more after the refine.
+      // Use a bounded compare so a huge document doesn't cost a full copy.
+      let cmpLen = min(snapAll.count, 200)
+      let cmpSnap = String(snapAll.suffix(cmpLen))
+      let cmpCurrent = String(currentAll.suffix(cmpLen))
+      if cmpSnap == cmpCurrent && !snap.after.isEmpty {
+        // Cursor to end, delete the after+appended, insert before.
+        textDocumentProxy.adjustTextPosition(byCharacterOffset: currentAfter.count)
+        for _ in 0..<(snap.after.count + snap.appendedAfter.count) {
+          textDocumentProxy.deleteBackward()
+        }
+        textDocumentProxy.insertText(snap.before)
+        lastRefineSnapshot = nil
+        if hasFullAccess { selectionHaptic.selectionChanged() }
+        setStatus("Undone.")
+        return
+      }
+      // Snapshot is stale (the user has since typed more or moved) — drop it
+      // and fall through to word-level undo.
+      lastRefineSnapshot = nil
+    }
+
+    // 2. Fallback: delete the last word.
     let before = textDocumentProxy.documentContextBeforeInput ?? ""
     if before.isEmpty { return }
     var count = 0
@@ -637,10 +675,94 @@ class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
   // MARK: - Mic / dictation (inline; requires Full Access)
 
   @objc private func micTapped() {
+    // Warm-keyboard gate: if the main app hasn't primed the background audio
+    // session (iOS-only need), the mic call would either fail outright or
+    // trigger a permission churn. Show the chip once, deep-link to the app,
+    // and abort this tap — the user comes back and taps again.
+    if !isAudioReady() {
+      showInstantVoiceChip()
+      openPrimeDeepLink()
+      return
+    }
     if kbConfig?.liveVoice == true {
       if isStreaming { stopStreaming() } else { startStreaming() }
     } else {
       if isRecording { stopAndTranscribe() } else { startRecording() }
+    }
+  }
+
+  // MARK: - Warm-keyboard chip ("Turn on instant voice")
+  //
+  // The main app publishes `tulmi.audioReady` + `tulmi.audioReadyAt` into the
+  // shared App Group after PrimeScreen starts the silent AVAudioSession. We
+  // treat the primer as fresh for 48 hours — after that iOS is likely to have
+  // reclaimed the session anyway, so we show the chip again.
+
+  private static let audioReadyMaxAgeSec: TimeInterval = 48 * 60 * 60
+  private var instantChipView: UIView?
+
+  private func isAudioReady() -> Bool {
+    let d = UserDefaults(suiteName: "group.com.tulmi.app")
+    guard d?.bool(forKey: "tulmi.audioReady") == true else { return false }
+    let atMs = d?.double(forKey: "tulmi.audioReadyAt") ?? 0
+    let ageSec = Date().timeIntervalSince1970 - (atMs / 1000)
+    return ageSec < KeyboardViewController.audioReadyMaxAgeSec
+  }
+
+  private func updateInstantVoiceChip() {
+    if isAudioReady() {
+      hideInstantVoiceChip()
+    } else {
+      showInstantVoiceChip()
+    }
+  }
+
+  private func showInstantVoiceChip() {
+    if instantChipView != nil { return }
+    let chip = UIButton(type: .system)
+    chip.setTitle("Tap to turn on instant voice ↗", for: .normal)
+    chip.setTitleColor(.black, for: .normal)
+    chip.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
+    chip.backgroundColor = UIColor(red: 1.0, green: 0.85, blue: 0.55, alpha: 1)
+    chip.layer.cornerRadius = 12
+    chip.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+    chip.translatesAutoresizingMaskIntoConstraints = false
+    chip.addTarget(self, action: #selector(chipTapped), for: .touchUpInside)
+    view.addSubview(chip)
+    NSLayoutConstraint.activate([
+      chip.topAnchor.constraint(equalTo: view.topAnchor, constant: 6),
+      chip.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      chip.heightAnchor.constraint(equalToConstant: 26),
+    ])
+    instantChipView = chip
+  }
+
+  private func hideInstantVoiceChip() {
+    instantChipView?.removeFromSuperview()
+    instantChipView = nil
+  }
+
+  @objc private func chipTapped() {
+    openPrimeDeepLink()
+  }
+
+  /// Open `tulmi://prime` in the main app. Keyboard extensions can call this
+  /// via `extensionContext.open()` once "Allow Full Access" is granted. If
+  /// that path isn't available, walk up the responder chain — a documented
+  /// fallback that still works on current iOS.
+  private func openPrimeDeepLink() {
+    guard let url = URL(string: "tulmi://prime") else { return }
+    if let ctx = extensionContext {
+      ctx.open(url, completionHandler: nil)
+      return
+    }
+    var responder: UIResponder? = self
+    while let r = responder {
+      if r.responds(to: NSSelectorFromString("openURL:")) {
+        _ = r.perform(NSSelectorFromString("openURL:"), with: url)
+        return
+      }
+      responder = r.next
     }
   }
 
@@ -812,8 +934,10 @@ class KeyboardViewController: UIInputViewController, AVAudioRecorderDelegate {
         guard let self = self else { return }
         switch result {
         case .success(let refined):
+          // Snapshot BEFORE we mutate the field, so undoTapped() can restore.
+          self.lastRefineSnapshot = (before: full, after: refined, appendedAfter: "")
           self.replaceFieldText(before: before, after: after, with: refined)
-          self.setStatus("")
+          self.setStatus("Refined. Undo restores the original.")
         case .failure(let err):
           self.setStatus("Error: \(err.localizedDescription)")
         }

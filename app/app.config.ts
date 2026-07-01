@@ -32,6 +32,15 @@ const config: ExpoConfig = {
     infoPlist: {
       NSMicrophoneUsageDescription:
         "Tulmi uses the microphone to turn your speech into clean text.",
+      // Background audio mode powers the "instant voice" warm-keyboard flow
+      // (see modules/tulmi-bridge/ios AudioKeepAlive + src/PrimeScreen). iOS
+      // needs this declaration for AVAudioSession to stay alive while the
+      // app is backgrounded, which is what lets the keyboard extension record
+      // in any host app without a switch-and-return.
+      UIBackgroundModes: ["audio"],
+      // Live Activity affordance for a future "Tailzu listening" widget —
+      // harmless to declare now; the app just won't publish activities yet.
+      NSSupportsLiveActivities: true,
     },
     // Shared container so the keyboard extension can read the app's backend URL
     // + the user's token (written by the tulmi-bridge native module).

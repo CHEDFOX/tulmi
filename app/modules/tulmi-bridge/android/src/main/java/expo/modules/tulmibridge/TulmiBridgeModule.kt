@@ -46,5 +46,28 @@ class TulmiBridgeModule : Module() {
         ?.startsWith(pkg) == true
       mapOf("enabled" to enabled, "fullAccess" to enabled, "selected" to selected, "lastActiveMs" to 0.0)
     }
+
+    // --- Audio keep-alive ---------------------------------------------------
+    //
+    // Android IMEs can hit the mic whenever the user has granted RECORD_AUDIO
+    // permission — no keep-alive dance is needed. These methods exist so the
+    // JS layer can call the same API on both platforms; on Android they
+    // report "always ready" so the keyboard chip stays hidden.
+
+    Function("startAudioKeepAlive") {
+      mapOf(
+        "ok" to true,
+        "readyAtMs" to System.currentTimeMillis().toDouble(),
+      )
+    }
+
+    Function("stopAudioKeepAlive") { true }
+
+    Function("getAudioKeepAliveState") {
+      mapOf(
+        "ready" to true,
+        "readyAtMs" to System.currentTimeMillis().toDouble(),
+      )
+    }
   }
 }
